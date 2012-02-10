@@ -1,0 +1,40 @@
+
+Switch 36 "switch1"
+[1]     "switch2"[1]
+[11]    "node1"[1]
+[12]    "node2"[1]
+[13]    "node3"[1]
+[14]    "node4"[1]
+    
+Switch 36 "switch2"
+[1]     "switch1"[1]
+[11]    "node5"[1]
+[12]    "node6"[1]
+[13]    "node7"[1]
+[14]    "node8"[1]
+
+# switch2
+Hca 2 "node1"
+[1] "edge1"[11]
+
+Hca 2 "node2"
+[1] "edge1"[12]
+
+Hca 2 "node3"
+[1] "edge1"[13]
+
+Hca 2 "node4"
+[1] "edge1"[14]
+
+# switch2
+Hca 2 "node5"
+[1] "edge2"[11]
+
+Hca 2 "node6"
+[1] "edge2"[12]
+
+Hca 2 "node7"
+[1] "edge2"[13]
+
+Hca 2 "node8"
+[1] "edge2"[14]
