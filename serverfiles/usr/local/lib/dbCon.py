@@ -20,7 +20,8 @@ class dbCon(object):
         self.countInsLink = 0
         self.insPerfQuery = ""
         # DB-Connect
-        self.__con = pgdb.connect( host='localhost', user='postgres',database='opensm' )
+        #self.__con = pgdb.connect( host='localhost', user='postgres',database='qnib' )
+        self.__con = pgdb.connect( user='postgres', database='qnib' )
         # Cursor auch
         self.__cur = self.__con.cursor()
     def convSpeed(self,speed):

@@ -13,9 +13,10 @@ import ConfigParser
 from optparse import OptionParser
 
 sys.path.append('/usr/local/lib/')
-from pysqlite2 import dbapi2 as sqlite3
+#from pysqlite2 import dbapi2 as sqlite3
+import sqlite3
 import libTopology
-import pydot, dbCon
+import dbCon
 
 class config(object):
     def __init__(self, cfgfiles, opt):

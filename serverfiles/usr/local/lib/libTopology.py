@@ -7,7 +7,8 @@ import ConfigParser
 from optparse import OptionParser
 
 sys.path.append('/usr/local/lib/')
-from pysqlite2 import dbapi2 as sqlite3
+#from pysqlite2 import dbapi2 as sqlite3
+import sqlite3
 import ckLib 
 
 def all(iterable):
@@ -61,7 +62,7 @@ class parseObj(object):
         self.name       = False
         self.id         = self.__repr__().split("at ")[1][-5:-1]
     def setName(self,name):
-        self.hostPat    = self.cfg.get("hostpat")
+        self.hostPat    = {} #self.cfg.get("hostpat")
         self.name       = name
         self.evalName()
     def evalName(self):
@@ -147,7 +148,7 @@ class parseSystem(parseObj):
         c_id = res[0]
         self.setChassisId(c_id)
     def evalGuid(self):
-        guids = self.cfg.get('sysimgguids')
+        guids = {} #self.cfg.get('sysimgguids')
         parseObj.evalGuid(self,guids)
     def __str__(self):
         return "%s[%s]%s" % (self.name,self.guid[-5:].self.id)
@@ -311,7 +312,7 @@ class parseNode(parseObj):
     def setPortLid(self,pnr,lid):
         self.ports[pnr].lid = lid
     def evalGuid(self):
-        guids = self.cfg.get('nodeguids')
+        guids = {} #self.cfg.get('nodeguids')
         parseObj.evalGuid(self,guids)
     def updateCnt(self):
         query = "UPDATE nodes SET"
@@ -1758,7 +1759,7 @@ class myTopo(topology):
     def create(self,qn):
         self.qn = qn
         # port vor locality, da evallink dort durchgefuehrt wird
-        for self.graph in self.cfg.get('graphs','types'):
+        for self.graph in ["plain"]: #self.cfg.get('graphs','types'):
             if self.opt.debug>=1: print "Erstelle Graphen '%s'" % self.graph
             self.log.start("create%s" % self.graph.title())
             cDB = self.cDB

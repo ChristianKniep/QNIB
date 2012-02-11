@@ -6,7 +6,7 @@ import re, os, sys, commands
 from optparse import OptionParser
 import pgdb, datetime
 
-sys.path.append('/usr/local/lib/')
+sys.path.append('/root/QNIB/serverfiles/usr/local/lib/')
 import dbCon
 from libTopology import *
 from ckLib import *
@@ -118,8 +118,8 @@ class checks(object):
         self.start = int(datetime.datetime.now().strftime("%s"))
         self.statusTXT = ""
         self.perfTXT = ""
-        self.hostPat = cfg.get('hostpat')
-        self.chassisNames = cfg.get('chassis')
+        self.hostPat = "" #cfg.get('hostpat')
+        self.chassisNames = "" #cfg.get('chassis')
         self.sysGuids = {}
         self.swPorts  = []
         self.cNr = None
@@ -131,7 +131,7 @@ class checks(object):
         self.chassis     = {}
         
         if self.opt.file=="":
-            cmd = "sudo  LD_PRELOAD=/usr/lib64/umad2sim/libumad2sim.so /usr/sbin/ibnetdiscover -g"
+            cmd = "sudo  LD_PRELOAD=/root/work/ibsim/umad2sim/libumad2sim.so /usr/local/sbin/ibnetdiscover -g"
             (ec,out) = commands.getstatusoutput(cmd)
             if ec!=0:
                 self.statusTXT = out+"ibnetdiscover failed"
@@ -377,7 +377,9 @@ class checks(object):
         prev_p_id = False
         p_stats = set([])
         n_stats = set([])
-        for row in res:
+        while True:
+            if len(res)>0:
+                row = res.pop()
             (s_id, s_name, s_status, n_id, n_name, n_status, p_id, port, p_status) = row
             if not prev_n_id:
                 # Beim ersten Lauf setzen wir die IDs initial
@@ -390,7 +392,6 @@ class checks(object):
                 p_stats.add(p_status)
                 prev_p_id   = p_id
             else:
-                print "Node '%s' durchgelaufen: %s" % (prev_n_name,",".join(p_stats))
                 # Wenn sich die n_id aendert, dann aktualisieren wir den Nodestatus
                 if 'chk' in p_stats:
                     query = "UPDATE nodes SET n_status='deg' WHERE n_id='%s';" % prev_n_id
@@ -405,6 +406,18 @@ class checks(object):
                 prev_n_id = n_id
                 prev_n_name = n_name
                 prev_p_id   = p_id
+            if len(res)==0:
+                # The last node has to be changed as well
+                if 'chk' in p_stats:
+                    query = "UPDATE nodes SET n_status='deg' WHERE n_id='%s';" % n_id
+                    self.db.ins(query)
+                elif set(['ok'])==p_stats:
+                    query = "UPDATE nodes SET n_status='ok' WHERE n_id='%s';" % n_id
+                    self.db.ins(query)
+                else:
+                    query = "UPDATE nodes SET n_status='nok' WHERE n_id='%s';" % n_id
+                    self.db.ins(query)
+                break
     def recursiv(self,node):
         kinder = [x.name for x,y in node.nLinks.items()]
         self.deb(node.getLids(),"Neue Rekursion von '%s' mit Kindern '%s'" % (node.name, ",".join(kinder)),'l',1)
