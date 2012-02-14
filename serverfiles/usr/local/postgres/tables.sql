@@ -1,9 +1,17 @@
+CREATE TABLE states (
+    state_id SERIAL,
+    state_name VARCHAR(5),
+    CONSTRAINT states_pk
+        PRIMARY KEY (state_id)
+);
+
+
 CREATE TABLE chassis (
     c_id SERIAL,	
     c_guid varchar (32),
     c_nr integer,
     c_name varchar (255),
-    c_status varchar(3) DEFAULT 'new',
+    --c_state_id INTEGER REFERENCES states(state_id) DEFAULT 1,
     CONSTRAINT chassis_pk
         PRIMARY KEY (c_id)
 );
@@ -14,24 +22,26 @@ CREATE TABLE systems (
     s_guid varchar (32),
     s_name varchar (255),
     s_real boolean DEFAULT 't',
-    s_status varchar(3) DEFAULT 'new',
+    s_state_id INTEGER REFERENCES states(state_id) DEFAULT 1,
     c_id integer DEFAULT 0,
     CONSTRAINT system_pk
         PRIMARY KEY (s_id)
 );
+
 CREATE TABLE nodetypes (
     nt_id SERIAL,	
     nt_name varchar (32),
     CONSTRAINT nodetypes_pk
         PRIMARY KEY (nt_id)
 );
+
 CREATE TABLE nodes (
     n_id SERIAL,
     n_rev INTEGER DEFAULT 0,
     n_guid varchar (32),
     n_name varchar (255),
     n_real boolean DEFAULT 't',
-    n_status varchar(3) DEFAULT 'new',
+    n_state_id INTEGER REFERENCES states(state_id) DEFAULT 1,
     s_id integer references systems(s_id) ON DELETE CASCADE,
     nt_id integer references nodetypes(nt_id),
     cir_cnt integer DEFAULT 0,
@@ -41,6 +51,7 @@ CREATE TABLE nodes (
     CONSTRAINT node_pk
         PRIMARY KEY (n_id)
 );
+
 CREATE TABLE ports (
     p_id SERIAL,	
     n_id integer references nodes(n_id) ON DELETE CASCADE,
@@ -48,9 +59,29 @@ CREATE TABLE ports (
     p_lid integer,
     p_int integer,
     p_ext integer,
-    p_status varchar(3) DEFAULT 'new',
+    p_state_id INTEGER REFERENCES states(state_id) DEFAULT 1,
     CONSTRAINT ports_pk PRIMARY KEY (p_id),
     CONSTRAINT con1     UNIQUE (n_id,p_int)
+);
+
+CREATE TABLE port_history (
+    ph_id SERIAL,
+    p_id INTEGER REFERENCES ports(p_id),
+    ph_state_id INTEGER REFERENCES states(state_id),
+    ph_time TIMESTAMP DEFAULT now(),
+    ph_message varchar(255),
+    CONSTRAINT port_history_pk
+        PRIMARY KEY (ph_id)
+);
+
+CREATE TABLE node_history (
+    nh_id SERIAL,
+    n_id INTEGER REFERENCES nodes(n_id),
+    nh_state_id INTEGER REFERENCES states(state_id),
+    nh_time TIMESTAMP DEFAULT now(),
+    nh_message varchar(255),
+    CONSTRAINT node_history_pk
+        PRIMARY KEY (nh_id)
 );
 
 CREATE TABLE circles (
@@ -126,3 +157,21 @@ CREATE TABLE sg_edges (
     sge_pos varchar(96),
     in_topo boolean DEFAULT 'f'
     );
+-- Perf/Err
+CREATE TABLE perfkeys (
+    pk_id SERIAL,	
+    pk_name varchar (255),
+    CONSTRAINT perfkey_pk
+        PRIMARY KEY (pk_id)
+);
+
+CREATE TABLE perfdata (
+    pd_id SERIAL,
+    p_id integer references ports(p_id) ON DELETE CASCADE,
+    pk_id integer references perfkeys(pk_id),
+    pdat_val bigint,
+    pdat_time timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT perfdata_pk
+        PRIMARY KEY (p_id,pk_id,pdat_time)
+);
+

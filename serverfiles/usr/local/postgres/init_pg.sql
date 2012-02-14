@@ -19,4 +19,7 @@ COMMENT ON SCHEMA public IS 'Standard public schema';
 CREATE LANGUAGE plpgsql;
 
 \i tables.sql;
+\i types.sql
 \i init_tabs.sql;
+\i osmInCnt.sql;
+
