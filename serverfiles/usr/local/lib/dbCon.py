@@ -20,10 +20,12 @@ class dbCon(object):
         self.countInsLink = 0
         self.insPerfQuery = ""
         # DB-Connect
-        #self.__con = pgdb.connect( host='localhost', user='postgres',database='qnib' )
         self.__con = pgdb.connect( user='postgres', database='qnib' )
         # Cursor auch
         self.__cur = self.__con.cursor()
+        
+        self.stateIds  = self.getStatesId()
+        self.stateNames= self.getStatesName()
     def convSpeed(self,speed):
         if      speed=='SDR': return 250
         elif    speed=='DDR': return 500
@@ -112,7 +114,8 @@ class dbCon(object):
             self.ins(query)
             p_id   = self.getIDWhere("ports","n_id='%s' and p_int='%s'" % (p_obj.n_id,p_obj.p_int))
         else:
-            query = "UPDATE ports SET p_status='ok',p_ext='%s' WHERE p_id='%s' AND p_status='chk'" % (p_obj.p_ext,p_id)
+            # TODO: ugly, because the p_state_id is hardwired
+            query = "UPDATE ports SET p_state_id='3',p_ext='%s' WHERE p_id='%s' AND p_state_id='2'" % (p_obj.p_ext,p_id)
             self.ins(query)
         return p_id
     def getIDWhere(self,table,where,debug=False):
@@ -196,127 +199,36 @@ class dbCon(object):
     def getLocality(self,lid):
         query = "SELECT * FROM getLocality('%s')" % lid
         return self.sel(query)[0]
-    def perfCacheEval(self):
-        S = int(datetime.datetime.now().strftime("%s"))
-        query = """SELECT nt_id,n_id,p_id,pk_id,pc_val,pkt_id,pk_name,p_guid,lid,dlid,port,dport,extport,width,speed, uplink, p_notseen,s_id,n_guid,nt_name
-                            FROM perfcache NATURAL JOIN perfkeys NATURAL JOIN ports NATURAL JOIN nodes NATURAL JOIN nodetypes ORDER BY pk_name"""
-        # dadurch wird sichergestellt, dass xmit_wait am ende auftaucht - wenn xmit_pkts schon eingetragen ist
-        res = self.sel(query)
-        pc = {'locality':0,'xmit_congMAX':0}
+    def getStatesName(self):
+        query = "SELECT state_id,state_name FROM states"
+        res = self.select(query)
+        acc = {}
         for row in res:
-            (nt_id,n_id,p_id,pk_id,pc_val,pkt_id,pk_name,p_guid,lid,dlid,port,dport,extport,width,speed, uplink, p_notseen,s_id,n_guid,nt_name) = row
-            pKey = "%s:%s"%(port,dport)
-            if not pc.has_key(lid):
-                (up,down,upIn,downOut,upOut,downIn) = self.getLocality(lid)
-                pc[lid]         = {'locUp':up,'locDown':down,'locUpIn':upIn,'locDownOut':downOut,'locUpOut':upOut,'locDownIn':downIn}
-            if not pc[lid].has_key(dlid):
-                pc[lid][dlid]   = { # Es werden die Keys mitgezogen, die auf die jeweiligen Caches passen,initialisiert mit akt. wert
-                                    'links':set([]),
-                                    'bwMAX':pKey,   # port-key der die maxBW hat
-                                    'bwMIN':pKey,   # minBW
-                                    "%sMAX"%pk_name:pKey,   # maximalwert des aktuell betrachteten performancekeys
-                                    "%sMIN"%pk_name:pKey,   # minwert "
-                                    pKey:{'bw':int(speed)*int(width),pk_name:pc_val}, # das ist der eigentliche Datencontainer
-                                }
-            else:
-                pc[lid][dlid]['links'].add(pKey)
-                if pk_name=="xmit_wait":
-                    src = pc[lid][dlid]
-                    pkMAX = "xmit_waitMAX"
-                    pkMIN = "xmit_waitMIN"
-                    xwMAX = "xmit_congMAX"
-                    xwMIN = "xmit_congMIN"
-                    if src[pKey]['xmit_pkts']!=0:
-                        xw  = float(pc_val)*1000/src[pKey]['xmit_pkts']
-                    else:
-                        xw  = 0.0
-                    pc[lid][dlid][pKey][pk_name]     = pc_val
-                    pc[lid][dlid][pKey]["xmit_cong"] = xw
-                    
-                    if not src.has_key(pkMIN):
-                        pc[lid][dlid][pkMIN]   = pKey
-                    if not src.has_key(pkMAX):
-                        pc[lid][dlid][pkMAX]   = pKey
-                    if pc_val>src[src[pkMAX]]:  pc[lid][dlid][pkMAX]   = pKey
-                    if pc_val<src[src[pkMIN]]:  pc[lid][dlid][pkMIN]   = pKey
-                    
-                    if not src.has_key(xwMIN):
-                        pc[lid][dlid][xwMIN]   = pKey
-                    if not src.has_key(xwMAX):
-                        pc[lid][dlid][xwMAX]   = pKey
-                    if xw>src[src[xwMAX]]:  pc[lid][dlid][xwMAX]   = pKey
-                    if xw<src[src[xwMIN]]:  pc[lid][dlid][xwMIN]   = pKey
-                    if xw>pc[xwMAX]:        pc[xwMAX]   = xw
-                else:
-                    src = pc[lid][dlid]
-                    pkMAX = "%sMAX"%pk_name
-                    pkMIN = "%sMIN"%pk_name
-                    
-                    if not src.has_key(pkMIN):
-                        pc[lid][dlid][pkMIN]   = pKey
-                    if not src.has_key(pkMAX):
-                        pc[lid][dlid][pkMAX]   = pKey
-                    
-                    if not pc[lid][dlid].has_key(pKey):
-                        pc[lid][dlid][pKey]    = {}
-                    pc[lid][dlid][pKey][pk_name] = pc_val
-                    
-                    bw = int(speed)*int(width)
-                    if (not src.has_key('bwMAX')) or bw>src[src['bwMAX']]['bw']:
-                        pc[lid][dlid]['bwMAX'] = pKey
-                    if (not src.has_key('bwMIN')) or bw<src[src['bwMIN']]['bw']:
-                        pc[lid][dlid]['bwMIN'] = pKey
-                    if (not src.has_key(pkMAX)) or pc_val>src[src[pkMAX]][pk_name]:
-                        pc[lid][dlid][pkMAX]   = pKey
-                    if (not src.has_key(pkMIN)) or pc_val<src[src[pkMIN]][pk_name]:
-                        pc[lid][dlid][pkMIN]   = pKey
-        E = int(datetime.datetime.now().strftime("%s"))
-        self.pc = pc
-        self.evalTime = E-S
-    def pcGetPort(self,lid,dlid):
-        src = self.pc[lid][dlid]
-        dst = self.pc[dlid][lid]
-        bw  = src[src['bwMAX']]['bw']
-        try: sD  = src[src['xmit_dataMAX']]['xmit_data']
-        except KeyError:
-            if self.opt.debug>=2: print "Keine Daten fuer xmit_dataMax: %s" % src
-            sD = 0
-        try: dD  = dst[dst['xmit_dataMAX']]['xmit_data']
-        except KeyError:
-            if self.opt.debug>=2: print "Keine Daten fuer xmit_data: %s" % dst[dst['xmit_dataMAX']]
-            dD = 0
-        res = (bw, sD,dD)
-        return res
-    def pcGetLinks(self,lid,dlid):
-        src = self.pc[lid][dlid]
-        dst = self.pc[dlid][lid]
-        bw = src[src['bwMAX']]['bw']
-        res = []
-        for link in src['links']:
-            (s,d) = link.split(":")
-            sP = src["%s:%s" % (s,d)]['xmit_pkts']
-            sC = src["%s:%s" % (s,d)]['xmit_cong']
-            dP = dst["%s:%s" % (d,s)]['xmit_pkts']
-            try: dC = dst["%s:%s" % (d,s)]['xmit_cong']
-            except: dC = 0
-            tmp = (sP,sC,link,dP,dC)
-            res.append(tmp)
-        return res
-    def pcGetLink(self,lid,dlid):
-        src = self.pc[lid][dlid]
-        dst = self.pc[dlid][lid]
-        max = self.pc['xmit_congMAX']
-        sC = src[src['xmit_congMAX']]['xmit_cong']
-        try: dC = dst[dst['xmit_congMAX']]['xmit_cong']
-        except: # wenn das auf die Schnautze faellt, dann ist es ein Host (keine Congestion moeglich)
-            dC = 0
-        res = (max,sC,dC)
-        return res
-    def pcGetLocality(self,lid):
-        up      = self.pc[lid]['locUp']
-        down    = self.pc[lid]['locDown']
-        upIn    = self.pc[lid]['locUpIn']
-        downOut = self.pc[lid]['locDownOut']
-        upOut   = self.pc[lid]['locUpOut']
-        downIn  = self.pc[lid]['locDownIn']
-        return up,down,upIn,downOut,upOut,downIn
+            (state_id,state_name) = row
+            acc[state_name] = int(state_id)
+        return acc
+    def getStatesId(self):
+        query = "SELECT state_id,state_name FROM states"
+        res = self.select(query)
+        acc = {}
+        for row in res:
+            (state_id,state_name) = row
+            acc[state_id] = state_name
+        return acc
+    def setNodeState(self,n_state_new,n_id,event):
+        # TODO: should be a postgres function
+        query = "SELECT n_state_id FROM nodes WHERE n_id='%s'" % n_id
+        n_state_old = self.selOne(query)[0]
+        if int(n_state_new)!=int(n_state_old):
+            query = "UPDATE nodes SET n_state_id='%s' WHERE n_id='%s';" % (n_state_new,n_id)
+            query += " INSERT INTO node_history (n_id,nh_state_id,nh_message) VALUES ('%s','%s','%s->%s');" % (n_id,n_state_new,n_state_old,n_state_new)
+            self.ins(query)
+    def setPortState(self,p_id,p_state_new):
+        query = "SELECT p_state_id FROM ports WHERE p_id='%s'" % p_id
+        p_state_old = self.selOne(query)[0]
+        if int(p_state_new)!=int(p_state_old) and self.stateIds[p_state_old]!='chk':
+            query = "UPDATE ports SET p_state_id='%s' WHERE p_id='%s';" % (p_state_new,p_id)
+            self.ins(query)
+            query = " INSERT INTO port_history (p_id,ph_state_id,ph_message) VALUES ('%s','%s','%s->%s');" % (p_id,p_state_new,p_state_old,p_state_new)
+            print query
+            self.ins(query)

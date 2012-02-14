@@ -109,13 +109,15 @@ class swPortExtExt(swPort):
 
 class checks(object):
     def __init__(self,db,options,cfg):
-        query = "UPDATE ports SET p_status='chk'"
-        db.exe(query)
         self.db = db
         self.cfg = cfg
         self.opt = options
         self.retEC = 0
         self.start = int(datetime.datetime.now().strftime("%s"))
+        self.stateIds = self.db.getStatesId()
+        self.stateNames = self.db.getStatesName()
+        query = "UPDATE ports SET p_state_id='%s'" % self.stateNames['chk']
+        db.exe(query)
         self.statusTXT = ""
         self.perfTXT = ""
         self.hostPat = "" #cfg.get('hostpat')
@@ -366,11 +368,12 @@ class checks(object):
                 self.deb(startSw.getLids(),"Ende: %s" % (startSw),'l',1)
                 break
     def evalHistory(self):
-        query = """SELECT s_id,s_name,s_status,n_id,n_name,n_status,p_id,p_int,p_status
+        query = """SELECT s_id, s_name, s_state_id, n_id, n_name, n_state_id,
+                            p_id, p_int, p_state_id
                     FROM nodes NATURAL JOIN ports NATURAL JOIN systems
                     ORDER BY s_id,n_id,p_id"""
         res = self.db.sel(query)
-        
+        res.reverse()
         prev_s_id = False
         prev_n_id = False
         prev_n_name = False
@@ -380,7 +383,10 @@ class checks(object):
         while True:
             if len(res)>0:
                 row = res.pop()
-            (s_id, s_name, s_status, n_id, n_name, n_status, p_id, port, p_status) = row
+            (s_id, s_name, s_state_id, n_id, n_name, n_state_id, p_id, port, p_state_id) = row
+            p_status = self.stateIds[p_state_id]
+            n_status = self.stateIds[n_state_id]
+            s_status = self.stateIds[s_state_id]
             if not prev_n_id:
                 # Beim ersten Lauf setzen wir die IDs initial
                 prev_s_id   = s_id
@@ -394,14 +400,12 @@ class checks(object):
             else:
                 # Wenn sich die n_id aendert, dann aktualisieren wir den Nodestatus
                 if 'chk' in p_stats:
-                    query = "UPDATE nodes SET n_status='deg' WHERE n_id='%s';" % prev_n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['deg']
                 elif set(['ok'])==p_stats:
-                    query = "UPDATE nodes SET n_status='ok' WHERE n_id='%s';" % prev_n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['ok']
                 else:
-                    query = "UPDATE nodes SET n_status='nok' WHERE n_id='%s';" % prev_n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['nok']
+                self.db.setNodeState(n_state_new,prev_n_id,"Event?")
                 p_stats = set([p_status])
                 prev_n_id = n_id
                 prev_n_name = n_name
@@ -409,14 +413,12 @@ class checks(object):
             if len(res)==0:
                 # The last node has to be changed as well
                 if 'chk' in p_stats:
-                    query = "UPDATE nodes SET n_status='deg' WHERE n_id='%s';" % n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['deg']
                 elif set(['ok'])==p_stats:
-                    query = "UPDATE nodes SET n_status='ok' WHERE n_id='%s';" % n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['ok']
                 else:
-                    query = "UPDATE nodes SET n_status='nok' WHERE n_id='%s';" % n_id
-                    self.db.ins(query)
+                    n_state_new = self.stateNames['nok']
+                self.db.setNodeState(n_state_new,n_id,"Event?")
                 break
     def recursiv(self,node):
         kinder = [x.name for x,y in node.nLinks.items()]
