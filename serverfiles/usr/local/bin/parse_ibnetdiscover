@@ -511,7 +511,7 @@ def main(argv=None):
         chk.evalMatches()
         chk.addPerf('countInsLink',db.countInsLink)
         chk.log()
-        time.sleep(60)
+        time.sleep(15)
     ec=chk.getEC()
     sys.exit(ec)
 
