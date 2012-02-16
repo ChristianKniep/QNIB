@@ -5,6 +5,7 @@
 import re, os, sys, commands
 from optparse import OptionParser
 import pgdb, datetime
+import time
 
 sys.path.append('/root/QNIB/serverfiles/usr/local/lib/')
 import dbCon
@@ -112,6 +113,7 @@ class checks(object):
         self.db = db
         self.cfg = cfg
         self.opt = options
+        self.log_file = "/var/log/parse_ibnetdiscover.log"
         self.retEC = 0
         self.start = int(datetime.datetime.now().strftime("%s"))
         self.stateIds = self.db.getStatesId()
@@ -485,29 +487,31 @@ class checks(object):
             print msg
         elif typ=='l' and self.opt.links and self.opt.debug>=deb:
             print msg
-
+    def log(self):
+        fd = open(self.log_file,"a")
+        msg = "%s \n" % self.__str__()
+        fd.write(msg)
+        fd.close()
+        
 def main(argv=None):
     # Parameter
-    options = Parameter(argv)
-    options.check()
-   
-    cfg = config([options.cfgfile,],options)
-    cfg.eval()
     
-    db = dbCon.dbCon(options) 
 
-    chk = checks(db,options,cfg)
-    if chk.retEC==0:
+    while True:
+        options = Parameter(argv)
+        options.check()
+       
+        cfg = config([options.cfgfile,],options)
+        cfg.eval()
+        db = dbCon.dbCon(options) 
+        chk = checks(db,options,cfg)
         chk.ibnetdiscover()
         chk.evalSwPorts(cfg)
         chk.evalHistory()
         chk.evalMatches()
-    else:
-        raise IOError("retEC!=0... ?!")
-    
-    chk.addPerf('countInsLink',db.countInsLink)
-    print chk
-    
+        chk.addPerf('countInsLink',db.countInsLink)
+        chk.log()
+        time.sleep(60)
     ec=chk.getEC()
     sys.exit(ec)
 
