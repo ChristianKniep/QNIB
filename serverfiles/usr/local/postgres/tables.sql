@@ -11,7 +11,6 @@ CREATE TABLE chassis (
     c_guid varchar (32),
     c_nr integer,
     c_name varchar (255),
-    --c_state_id INTEGER REFERENCES states(state_id) DEFAULT 1,
     CONSTRAINT chassis_pk
         PRIMARY KEY (c_id)
 );
