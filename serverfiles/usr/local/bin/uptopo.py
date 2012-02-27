@@ -48,9 +48,13 @@ class config(object):
         else:           return self.data[section][option]
 
 class graph(object):
-    def __init__(self, cDB):
+    def __init__(self, cDB, options):
+        self.opt = options
         self.cDB = cDB
         self.links = set([])
+    def deb(self,msg,deb=3):
+        if self.opt.debug>=deb:
+            print "graph> %s" % msg
     def evalSystems(self):
         seenSys = []
         systemsNext = []
@@ -85,18 +89,20 @@ class graph(object):
                 switches.append(chassis_sys)
             elif system.nt_name=="switch":
                 switches.append(system)
+                self.deb("Appende Switch: %s" % system,1)
             else:
                 systemsNext.append(system)
         
         while True:
-            if len(systemsNext)==0: break
+            if len(systemsNext)==0 and len(switches)==0: break
             if len(switches)!=0:
                 system = switches.pop()
+                self.deb("Poppe Switch: %s" % system,2)
             else:
                 system = systemsNext.pop()
             #system.alterEdgesSid(changedSids)
             if system.nt_name=='switch' and self.cDB.isEdgeSwitch(system.s_id):
-                print "## Edge: ",system, str(self.cDB.isEdgeSwitch(system.s_id))
+                self.deb("## Edge: %s | %s" % (system, str(self.cDB.isEdgeSwitch(system.s_id))),1)
                 sg_id = self.cDB.addCluster(system.name)
                 gn_id = self.cDB.sys2SgNode(system,sg_id)
                 childs = self.cDB.getSysChilds(system.s_id)
@@ -108,21 +114,25 @@ class graph(object):
                             print """ Child '%s' nicht in Liste der systeme... Juckt mich das? """ % child
                             print "Ich glaube ja! ENDE!"
                             sys.exit()
-                        print """## Switch hat Child: """, child
+                        self.deb("""## Switch hat Child: %s""" % child,1)
                         gn_id = self.cDB.sys2SgNode(child,sg_id)
+                    elif not self.cDB.isEdgeSwitch(child.s_id):
+                        # Ja, was machen wir da?
+                        self.deb("## Kein Edge: %s" % child,1)
+                        gn_id = self.cDB.sys2SgNode(child)
             else:
                 """ Es handelt sich nicht um ein geclusterten Knoten """
-                print "## Child: ",system
+                self.deb("## Child: %s"%system,1)
                 gn_id = self.cDB.sys2SgNode(system)
             for edge in system.edges:
                 self.links.add(edge)
         for link in self.links:
             link.setSids(changedSids)
-            #try:
-            self.cDB.addGSysEdge(link.src_sId,link.dst_sId)
-            #except:
-            #    print link, changedSids
-            #    raise IOError
+            try:
+                self.cDB.addGSysEdge(link.src_sId,link.dst_sId)
+            except:
+                print link, changedSids
+                raise IOError
     def addNode(self, node):
         pass
 
@@ -239,16 +249,10 @@ class graphSys(object):
     def isSwitch(self):
         return self.nt_name=="switch"
     
-def main(argv=None):
-    # Parameter
-    options = libTopology.Parameter(argv)
-    options.check()
+def eval_topo(options,cfg):
     
-    log = libTopology.logC()
-    
-    cfg = config([options.netcfg, options.topocfg], options)
-    cfg.eval()
-    
+    log = libTopology.logC("/var/log/uptopo.log")
+        
     db = dbCon.dbCon(options)
     try: os.remove("/tmp/topology.db")
     except: pass
@@ -257,7 +261,7 @@ def main(argv=None):
     
     cDB.init()
     ## Los gehts
-    G = graph(cDB)
+    G = graph(cDB,options)
     G.evalSystems()
 
     topo = libTopology.myTopo(cDB,options,cfg,log)
@@ -265,6 +269,7 @@ def main(argv=None):
     topo.fixPositions()
     
     cDB.bkpDat()
-        
+    print log
+    
 if __name__ == "__main__":
     main()

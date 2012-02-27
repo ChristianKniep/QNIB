@@ -10,7 +10,7 @@ import time
 sys.path.append('/root/QNIB/serverfiles/usr/local/lib/')
 import dbCon
 from libTopology import *
-from ckLib import *
+import uptopo
 
 
 class Parameter(object):
@@ -34,7 +34,9 @@ class Parameter(object):
         
         self.parser.add_option("-f", dest="file", default="", action="store", help="file which contains the ibnetdiscover-output")
         self.parser.add_option("-L", dest="lids", default=False, action="store", help="lid to debug (all other debug information will be supressed)")
-        self.parser.add_option("-C", dest="cfgfile", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Configfile (default: %default)")
+        self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
+        self.parser.add_option("--loop", dest="loop", default=False, action = "store_true", help = "Loop the script")
+        self.parser.add_option("--delay", dest="loop_delay", default="30", action = "store", help = "Delay in seconds if loop is set (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
         self.parser.add_option("--circle",dest="circle",default=False, action = "store_true", help = "Show circle debug information")
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
@@ -123,7 +125,7 @@ class checks(object):
         self.statusTXT = ""
         self.perfTXT = ""
         self.hostPat = "" #cfg.get('hostpat')
-        self.chassisNames = "" #cfg.get('chassis')
+        self.chassisNames = cfg.get('chassis')
         self.sysGuids = {}
         self.swPorts  = []
         self.cNr = None
@@ -220,7 +222,8 @@ class checks(object):
             self.cNr                = m.group(1)
             chassisguid             = m.group(2)
             self.chassis[self.cNr]  = chassisguid
-            cId = self.db.getIns_ID('chassis',"c_guid='%s'" % str(chassisguid),['c_guid','c_nr','c_name'], [str(chassisguid),self.cNr,self.chassisNames[chassisguid]['name']])
+            cId = self.db.getIns_ID('chassis',"c_guid='%s'" % str(chassisguid),['c_guid','c_nr','c_name'], \
+                                    [str(chassisguid),self.cNr,self.chassisNames[chassisguid]['name']])
         return m
     def matchContinue(self,line):
         # HCA-Zeilen
@@ -495,14 +498,13 @@ class checks(object):
         
 def main(argv=None):
     # Parameter
-    
 
     while True:
         options = Parameter(argv)
         options.check()
-       
-        cfg = config([options.cfgfile,],options)
+        cfg = uptopo.config([options.cfgfile,],options)
         cfg.eval()
+        
         db = dbCon.dbCon(options) 
         chk = checks(db,options,cfg)
         chk.ibnetdiscover()
@@ -511,7 +513,11 @@ def main(argv=None):
         chk.evalMatches()
         chk.addPerf('countInsLink',db.countInsLink)
         chk.log()
-        time.sleep(15)
+        uptopo.eval_topo(options,cfg)
+        # If we are not suppose to loop the script, we break
+        if not options.loop:
+            break
+        time.sleep(options.loop_delay)
     ec=chk.getEC()
     sys.exit(ec)
 
