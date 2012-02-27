@@ -144,6 +144,7 @@ CREATE TABLE sg_nodes (
     gn_width varchar(64),
     gn_height varchar(64),
     gn_tooltip varchar(128),
+    gn_fontcolor varchar(128),
     in_topo boolean DEFAULT 'f'
     );
 CREATE TABLE sg_edges (
