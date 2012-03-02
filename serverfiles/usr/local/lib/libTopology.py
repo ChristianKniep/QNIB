@@ -23,7 +23,8 @@ def any(iterable):
     return False
 
 class logC(object):
-    def __init__(self,log_file=None):
+    def __init__(self, opt, log_file=None):
+        self.opt = opt
         self.log_file   = log_file
         self.statusTXT = ""
         self.perfTXT = ""
@@ -57,7 +58,10 @@ class logC(object):
     def finish(self,stat):
         self.addPerf(stat,self.res[stat])
         self.res[stat] = 0
-        
+    def debug(self, msg, deb=3):
+        if self.opt.debug>=deb:
+            print msg
+            
 class parseObj(object):
     def __init__(self,db,opt,cfg,allGuids):
         self.db         = db
@@ -161,13 +165,13 @@ class parseSystem(parseObj):
 class parsePort(parseObj):
     def __init__(self,db,opt,cfg,allGuids):
         parseObj.__init__(self,db,opt,cfg,allGuids)
-        self.p_int       = 0
+        self.p_int   = 0
         self.p_ext   = 0
-        self.lid        = 0
-        self.n_id       = 0
+        self.lid   = 0
+        self.n_id    = 0
         self.db_activity=False
     def setPNr(self,p_int):
-        self.p_int           = p_int
+        self.p_int   = p_int
         if self.p_ext==0:
             self.p_ext   = p_int
     def setExtPNr(self,p_ext):
@@ -224,7 +228,7 @@ class edgeClass(object):
         # Posisiton brauchen wir immer
         if self.edgeOpts['pos']!="" and self.edgeOpts['pos']!="None":
             self.opts += "pos=%s " % self.edgeOpts['pos']
-        self.opts += 'arrowhead = \"none\"'
+        self.opts += 'arrowhead = \"none\" minlen = \"3\"'
     def setInTopo(self):
         query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' AND ge_dst_gnid='%s'" % (self.src_gnid,self.dst_gnid)
         self.db.ins(query)
@@ -481,7 +485,7 @@ class thePath(object):
             self.deb("Adde %s" % link,3)
             self.links.add(link)
     def addNode(self,node):
-        self.deb("Adde %s" % node,3)
+        self.deb("Adde %s" % node,0)
         self.nodes.append(node)
     def linkIn(self,linkList):
         if 0==len(self.links): return False
@@ -495,6 +499,7 @@ class thePath(object):
             self.links.remove(link)
     def rmNode(self,node):
         node.updateCnt()
+        self.deb("Rm %s" % node,0)
         self.nodes.remove(node)
     def flush(self,node):
         ns = list(self.nodes)
@@ -518,31 +523,41 @@ class node(object):
         return res
     def setNodeInfo(self,row):
         (sg_id, c_id, s_id, n_id, n_status, gn_id, \
-         gn_name, gn_pos, gn_shape, gn_width, gn_height) = row
+         gn_name, gn_shape) = row
         self.sg_id  =  sg_id
         self.c_id   = c_id
         self.s_id   = s_id
         self.n_id   = n_id
         self.n_status = n_status
         self.gn_id  = gn_id
-        self.nodeOpts['pos']    = gn_pos
         self.nodeOpts['shape']  = gn_shape
-        self.nodeOpts['width']  = gn_width
-        self.nodeOpts['height'] = gn_height
-        
+        query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
+        res = self.db.sel(query)
+        for row in res:
+            (key,val) = row
+            self.nodeOpts[key] = val
         statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
         res = self.db.selOne(statQ)
         s_rev = res[0]
-        self.nodeOpts['tooltip']= "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id,c_id,s_id,s_rev,n_id)
+        self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id,c_id,s_id,s_rev,n_id)
+        self.nodeOpts['URL'] = "None"
         
         if not self.nodeOpts['shape']:
             if self.nt_name=='switch':
-                self.nodeOpts['shape']  = 'box'
+                self.nodeOpts['shape']  = 'octagon'
             elif self.nt_name=='host':
-                self.nodeOpts['shape']  = 'plaintext'
-        if self.n_status=="deg":
+                self.nodeOpts['shape']  = 'none'
+        # Eval states
+        if self.n_status=="fail":
+                self.nodeOpts['fontcolor']  = 'red'
+        elif self.n_status=="new":
+                self.nodeOpts['fontcolor']  = 'darkgreen'
+                self.nodeOpts['style']      = 'filled'
+        elif self.n_status=="nok":
+                self.nodeOpts['fontcolor']  = 'blue'
+        elif self.n_status=="deg":
             if self.nt_name=='switch':
-                self.nodeOpts['fontcolor']  = 'yellow'
+                self.nodeOpts['fontcolor']  = 'orange'
             else:
                 self.nodeOpts['fontcolor']  = 'red'
     def getNodeOpts(self,design=False):
@@ -860,6 +875,14 @@ class cacheDB(object):
                 CONSTRAINT doppelcheck UNIQUE (sg_id,sgo)
             );"""
             )
+        self.__cur.execute("""CREATE TABLE sgn_options (
+                sgno_id INTEGER PRIMARY KEY,
+                sgn_id INTEGER,
+                sgno_key varchar(56),
+                sgno_val varchar(255),
+                CONSTRAINT doppelcheck UNIQUE (sgn_id,sgno_key)
+            );"""
+            )
         self.__cur.execute("""CREATE TABLE sg_nodes (
                 gn_id INTEGER PRIMARY KEY,
                 sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE, --Nodes are connected to subgraph
@@ -867,12 +890,7 @@ class cacheDB(object):
                 n_id INTEGER,
                 c_id INTEGER DEFAULT 0,
                 gn_name varchar(64),
-                gn_pos varchar(64),
                 gn_shape varchar(64),
-                gn_width varchar(64),
-                gn_height varchar(64),
-                gn_tooltip varchar(128),
-                gn_fontcolor varchar(128),
                 in_topo boolean DEFAULT 'f'
             );"""
             )
@@ -894,6 +912,14 @@ class cacheDB(object):
                 n_id INTEGER PRIMARY KEY,
                 name varchar(32)
             );""")
+        # opensm
+        self.__cur.execute("""CREATE TABLE traps (
+                trap_id INTEGER PRIMARY KEY,
+                trap_type integer,
+                trap_event integer,
+                trap_lid integer,
+                trap_time timestamp DEFAULT CURRENT_TIMESTAMP
+            );""")
         self.commit()
     def commit(self):
         self.commitCount += 1
@@ -914,12 +940,14 @@ class cacheDB(object):
                 'links',
                 'circles',
                 'circles_x',
+                'traps',
                 ]
         if topo:
             tabs.extend([
             'subgraphs',
             'g_edges',
             'sg_options',
+            'sgn_options',
             'sg_nodes',
             'sg_edges',
             ])
@@ -933,6 +961,7 @@ class cacheDB(object):
             'g_edges',
             'sg_options',
             'sg_nodes',
+            'sgn_options',
             'sg_edges',
         ]
         for tab in tabs:
@@ -976,6 +1005,7 @@ class cacheDB(object):
             self.__cur.execute("INSERT INTO states (state_name) VALUES ('ok');")
             self.__cur.execute("INSERT INTO states (state_name) VALUES ('deg');")
             self.__cur.execute("INSERT INTO states (state_name) VALUES ('nok');")
+            self.__cur.execute("INSERT INTO states (state_name) VALUES ('fail');")
         else:
             self.__cur.execute("UPDATE sg_nodes SET in_topo='f';")
             self.__cur.execute("UPDATE sg_edges SET in_topo='f';")
@@ -1452,16 +1482,15 @@ class cacheDB(object):
             if dstN_name=='None':   dst_name = dstS_name
             else:                   dst_name = dstN_name
             if dst_type in ('switch','spine'):
+                raise IOError('What\'s this for...')
                 # Bei einem Switch legen wir eine g_edge an (Kante in keinem Subgraphen)
                 queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
                 if not in_sg=='t':
                     queryUp = "UPDATE nodes SET in_sg='t' WHERE n_id='%s'" % dN_id
                     self.__cur.execute(queryUp)
-                    queryIns = "INSERT INTO g_switches (n_id,name) VALUES ('%s','%s')" % (dN_id,dst_name)
-                    self.__cur.execute(queryIns)
             else:            
-                queryIns = "INSERT INTO sg_nodes VALUES (NULL,'%s','%s','%s','','','','')" % (sg_id,dN_id,dst_name)
+                queryIns = "INSERT INTO sg_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
                 self.__cur.execute(queryIns)
                 queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','','f')" % (sg_id,n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
@@ -1485,7 +1514,7 @@ class cacheDB(object):
                     queryIns = "INSERT INTO g_switches (n_id,name) VALUES ('%s','%s')" % (dN_id,dst_name)
                     self.__cur.execute(queryIns)
             else:            
-                queryIns = "INSERT INTO sg_nodes VALUES (NULL,'%s','%s','%s','','','','')" % (sg_id,dN_id,dst_name)
+                queryIns = "INSERT INTO sg_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
                 self.__cur.execute(queryIns)
                 queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','','f')" % (sg_id,n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
@@ -1557,6 +1586,19 @@ class cacheDB(object):
             query = "SELECT gn_id FROM sg_nodes WHERE s_id='%s'" % system.s_id
             gn_id = self.selOne(query)[0]
             return gn_id
+    def upsert_sgno(self,key,val,gn_id):
+        query = "SELECT sgno_id, sgno_val FROM sgn_options WHERE sgn_id='%s' AND sgno_key='%s'" % (gn_id,key)
+        res = self.selOne(query)
+        if res!=None and res[1]!=val:
+            query = "UPDATE sgn_options SET sgno_val='%s' WHERE sgno_id='%s'" % (val,res[0])
+            self.ins(query)
+        elif key=='shape':
+            query = "UPDATE sg_nodes SET gn_shape='%s' WHERE gn_id='%s'" % (val,gn_id)
+            self.ins(query)
+        else:
+            query = """INSERT INTO sgn_options (sgn_id,sgno_key,sgno_val)
+                        VALUES ('%s', '%s', '%s')""" % (gn_id,key,val)
+            self.ins(query)
 
 class topology(object):
     def __init__(self,cDB,opt,cfg,log):
@@ -1648,21 +1690,27 @@ class topology(object):
                 line = "%s -> %s [arrowhead =\"none\"];" % (sge_src,sge_dst)
             self.write(fd,line)
     def drawSgNodes(self,fd,sg_id):
-        query = "SELECT gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_pos,gn_shape,gn_width,gn_height FROM sg_nodes WHERE sg_id='%s' WHERE in_topo='f'" % sg_id
-        print query
+        query = "SELECT gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_shape FROM sg_nodes WHERE sg_id='%s' WHERE in_topo='f'" % sg_id
         res = self.cDB.sel(query)
         for row in res:
-            (gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_pos,gn_shape,gn_width,gn_height) = row
+            (gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_shape) = row
             statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
             res = self.cDB.selOne(query)
             s_rev = res[0]
             tt = "gn_id:%s // s_id:%s // count(s_rev):%s // n_id:%s" % (gn_id,c_id,s_id,s_rev,n_id)
             setOpt = False
             opts = "[ "
-            for k,v in {'pos':gn_pos,'shape':gn_shape,'width':gn_width,'heigth':gn_height,"tooltip":tt}.items():
+            for k,v in {'shape':gn_shape,"tooltip":tt}.items():
                 if not (v==None or v==""):
+                    if k=='tooltip':
+                        opts += 'URL=None'
                     setOpt = True
-                    opts += "%s=%s " % (k,v)
+                    opts += "%s=\"%s\"" % (k,v)
+            sgno_query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
+            sgno_res   = self.cDB.sel(query)
+            for sgno_row in sgno_res:
+                (key,val) = sgno_row
+                opts += "%s=\"%s\""
             opts += "]"
             if setOpt:
                 self.write(fd,"\"%s\" %s;" % (gn_name,opts))
@@ -1739,7 +1787,6 @@ class topology(object):
             node = m.group(1)
             opts = m.groups()[1:]
             if node not in ('node','edge','graph'):
-                print node,opts
                 self.alterNode(node,opts[0])
     def matchGraph(self,line):
         # Befinden wir uns in einem subgraph?
@@ -1753,9 +1800,9 @@ class topology(object):
                 query = "SELECT sg_id FROM subgraphs WHERE sg_name='%s'" % self.subgraph
                 res = self.cDB.selOne(query)
                 self.sg_id = res[0]
-                print "##### Subgraph '%s' mit id '%s' startet" % (self.subgraph,self.sg_id)
+                self.log.debug("##### Subgraph '%s' mit id '%s' startet" % (self.subgraph,self.sg_id),1)
         if line=="\t}":
-            print "Subgraph '%s' mit id '%s' endet" % (self.subgraph,self.sg_id)
+            self.log.debug("Subgraph '%s' mit id '%s' endet" % (self.subgraph,self.sg_id),1)
             self.subgraph = ""
             self.sg_id = 0
         # Matche graph-Options
@@ -1799,10 +1846,14 @@ class topology(object):
             query = "UPDATE g_edges SET ge_pos='%s' WHERE ge_src='%s' AND ge_dst='%s'" % (pos,src,dst)
         self.cDB.ins(query)
     def alterNode(self,node,opts):
+        query = "SELECT gn_id FROM sg_nodes WHERE gn_name='%s'" % node
+        res = self.cDB.selOne(query)
+        if len(res)!=1:
+            raise IOError("Node '%s' nicht vorhanden" % node)
+        gn_id = res[0]
         for opt in opts.split(", "):
             (k,v) = opt.split("=")
-            query = "UPDATE sg_nodes SET gn_%s='%s' WHERE gn_name='%s'" % (k,v,node)
-            self.cDB.ins(query)
+            self.cDB.upsert_sgno(k,v,gn_id)
 
 class myTopo(topology):
     """ Ueberladen der eigentlichen topology-Klasse """
@@ -1853,13 +1904,13 @@ class myTopo(topology):
         query = """SELECT sg_id,sgn.c_id,sgn.s_id,sgn.n_id,
                     (SELECT state_name FROM states WHERE state_id=n_state_id)
                     AS n_status,
-                    gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height
+                    gn_id,gn_name,gn_shape
                 FROM sg_nodes sgn JOIN nodes n ON n.s_id=sgn.s_id WHERE sg_id='%s' AND sgn.in_topo='f'""" % sg_id
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
             (sg_id, c_id, s_id, n_id, n_state_id, gn_id, \
-             gn_name, gn_pos, gn_shape, gn_width, gn_height) = row
+             gn_name, gn_shape) = row
             item = nodeGnId(self.opt, self.cDB, self.cfg, gn_id)
             item.setNodeInfo(row)
             if not design:
@@ -1871,13 +1922,13 @@ class myTopo(topology):
         query = """SELECT sg_id, sgn.c_id, sgn.s_id, sgn.n_id,
                     (SELECT state_name FROM states WHERE state_id=n_state_id)
                     AS n_status,
-                    gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height
+                    gn_id,gn_name,gn_shape
                 FROM sg_nodes sgn JOIN nodes n ON n.s_id=sgn.s_id WHERE sgn.in_topo='f'"""
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
-            (sg_id, c_id, s_id, n_id, n_status, gn_id, gn_name, \
-             gn_pos, gn_shape, gn_width, gn_height) = row
+            (sg_id, c_id, s_id, n_id, n_status, \
+             gn_id, gn_name, gn_shape) = row
             item = nodeGnId(self.opt,self.cDB,self.cfg,gn_id)
             item.setNodeInfo(row)
             if not design:
@@ -1979,6 +2030,7 @@ class Parameter(object):
             help="increases debug [default:None, -d:1, -ddd: 3]")
         self.parser.add_option("-c", dest="netcfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Network configfile (default: %default)")
         self.parser.add_option("-t", dest="topocfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/topology.cfg", action = "store", help = "Topology configfile (default: %default)")
+        self.parser.add_option("-C", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
         self.parser.add_option("--circle",dest="circle",default=False, action = "store_true", help = "Show circle debug information")
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
@@ -1986,3 +2038,32 @@ class Parameter(object):
         self.parser.add_option("--dot",dest="dot",default=False, action = "store_true", help = "Show graphviz debug information")
     def check(self):
         pass
+
+class config(object):
+    def __init__(self, cfgfiles, opt):
+        self.opt = opt
+        self.deb = opt.debug
+        self.cfg = ConfigParser.ConfigParser()
+        self.cfgfiles = cfgfiles
+    def eval(self):
+        for cfgfile in self.cfgfiles:
+            self.cfg.read(cfgfile)
+            self.data = {}
+            for section in self.cfg.sections():
+                self.data[section] = {}
+                for form in self.cfg.options(section):
+                    self.data[section][form] = {}
+                    val = self.cfg.get(section, form)
+                    for opt in val.split(",,"):
+                        (k, v) = opt.split(";;")
+                        self.data[section][form][k] = v
+    def __str__(self):
+        res = ""
+        for section, options in self.data.items():
+            res += "# %s\n" % section
+            for option in options.keys():
+                res += "## %s\n" % option
+        return res
+    def get(self, section, option=""):
+        if option == "":  return self.data[section]
+        else:           return self.data[section][option]

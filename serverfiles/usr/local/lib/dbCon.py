@@ -110,12 +110,15 @@ class dbCon(object):
     def upsertPort(self,p_obj):
         p_id   = self.getIDWhere("ports","n_id='%s' and p_int='%s'" % (p_obj.n_id,p_obj.p_int))
         if not p_id:
-            query = "INSERT INTO ports (n_id,p_int,p_ext) VALUES  ('%s','%s','%s')" % (p_obj.n_id,p_obj.p_int,p_obj.p_ext)
+            query = "INSERT INTO ports (n_id,p_int,p_ext,p_lid) VALUES  ('%s','%s','%s','%s')" % (p_obj.n_id,p_obj.p_int,p_obj.p_ext,p_obj.lid)
             self.ins(query)
             p_id   = self.getIDWhere("ports","n_id='%s' and p_int='%s'" % (p_obj.n_id,p_obj.p_int))
         else:
             # TODO: ugly, because the p_state_id is hardwired
-            query = "UPDATE ports SET p_state_id='3',p_ext='%s' WHERE p_id='%s' AND p_state_id='2'" % (p_obj.p_ext,p_id)
+            query = """UPDATE ports SET p_state_id='%s',p_ext='%s',p_lid='%s'
+                        WHERE p_id='%s' AND p_state_id='%s'""" % \
+                        (self.stateNames['ok'], p_obj.p_ext,\
+                         p_obj.lid, p_id,self.stateNames['chk'])
             self.ins(query)
         return p_id
     def getIDWhere(self,table,where,debug=False):
@@ -135,7 +138,9 @@ class dbCon(object):
         query = "SELECT %s FROM %s WHERE %s" % (idName,table,where)
         if debug: print query
         id = self.select(query)
-        if id: return id[0][0]
+        if id:
+            if debug: print id[0][0]
+            return id[0][0]
         else:  return None
     def update(self,query,debug=3):
         self.commit()
@@ -217,12 +222,17 @@ class dbCon(object):
         return acc
     def setNodeState(self,n_state_new,n_id,event):
         # TODO: should be a postgres function
-        query = "SELECT n_state_id FROM nodes WHERE n_id='%s'" % n_id
-        n_state_old = self.selOne(query)[0]
-        if int(n_state_new)!=int(n_state_old):
-            query = "UPDATE nodes SET n_state_id='%s' WHERE n_id='%s';" % (n_state_new,n_id)
-            query += " INSERT INTO node_history (n_id,nh_state_id,nh_message) VALUES ('%s','%s','%s->%s');" % (n_id,n_state_new,n_state_old,n_state_new)
+        query = "SELECT n_state_id,state_name FROM nodes JOIN states ON n_state_id=state_id WHERE n_id='%s'" % n_id
+        res = self.selOne(query)
+        n_state_old = res[0]
+        if self.stateNames['new']==n_state_old==n_state_new:
+            query = "INSERT INTO node_history (n_id,nh_state_id,nh_message) VALUES ('%s','%s','new');" % (n_id,n_state_new)
             self.ins(query)
+        elif int(n_state_new)!=int(n_state_old):
+            query =  "UPDATE nodes SET n_state_id='%s' WHERE n_id='%s';" % (n_state_new,n_id)
+            query += "INSERT INTO node_history (n_id,nh_state_id,nh_message) VALUES ('%s','%s','%s->%s');" % (n_id,n_state_new,self.stateIds[n_state_old],self.stateIds[n_state_new])
+            self.ins(query)
+            
     def setPortState(self,p_id,p_state_new):
         query = "SELECT p_state_id FROM ports WHERE p_id='%s'" % p_id
         p_state_old = self.selOne(query)[0]
@@ -230,5 +240,35 @@ class dbCon(object):
             query = "UPDATE ports SET p_state_id='%s' WHERE p_id='%s';" % (p_state_new,p_id)
             self.ins(query)
             query = " INSERT INTO port_history (p_id,ph_state_id,ph_message) VALUES ('%s','%s','%s->%s');" % (p_id,p_state_new,p_state_old,p_state_new)
-            print query
             self.ins(query)
+    def getTraps(self):
+        query =  """SELECT
+                        trap_id, trap_type, trap_event, trap_lid, trap_time
+                    FROM traps"""
+        res = self.sel(query)
+        trap_list = []
+        ids = []
+        trap_dict = {}
+        for row in res:
+            t_id   = int(row[0])
+            t_type  = int(row[1])
+            t_event = int(row[2])
+            t_lid   = int(row[3])
+            t_time  = row[4]
+            ids.append(str(t_id))
+            if t_type==1:
+                trap_list.append([
+                            t_id,
+                            t_type,
+                            t_event,
+                            t_lid,
+                            t_time,
+                           ])
+                if not trap_dict.has_key(t_lid):
+                    trap_dict[t_lid] = set([])
+                trap_dict[t_lid].add(t_event)
+                    
+        if len(ids)>0:
+            query = "DELETE FROM traps WHERE trap_id in ('%s')" % "','".join(ids)
+            self.exe(query)
+        return (trap_dict,trap_list)

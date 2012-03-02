@@ -18,34 +18,6 @@ import sqlite3
 import libTopology
 import dbCon
 
-class config(object):
-    def __init__(self, cfgfiles, opt):
-        self.opt = opt
-        self.deb = opt.debug
-        self.cfg = ConfigParser.ConfigParser()
-        self.cfgfiles = cfgfiles
-    def eval(self):
-        for cfgfile in self.cfgfiles:
-            self.cfg.read(cfgfile)
-            self.data = {}
-            for section in self.cfg.sections():
-                self.data[section] = {}
-                for form in self.cfg.options(section):
-                    self.data[section][form] = {}
-                    val = self.cfg.get(section, form)
-                    for opt in val.split(",,"):
-                        (k, v) = opt.split(";;")
-                        self.data[section][form][k] = v
-    def __str__(self):
-        res = ""
-        for section, options in self.data.items():
-            res += "# %s\n" % section
-            for option in options.keys():
-                res += "## %s\n" % option
-        return res
-    def get(self, section, option=""):
-        if option == "":  return self.data[section]
-        else:           return self.data[section][option]
 
 class graph(object):
     def __init__(self, cDB, options):
@@ -249,15 +221,15 @@ class graphSys(object):
     def isSwitch(self):
         return self.nt_name=="switch"
     
-def eval_topo(options,cfg):
+def eval_topo(options,cfg,log):
     
-    log = libTopology.logC("/var/log/uptopo.log")
-        
     db = dbCon.dbCon(options)
-    try: os.remove("/tmp/topology.db")
-    except: pass
-    cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
-    #cDB = libTopology.cacheDB(options, cfg, db, log)
+    if False:
+        try: os.remove("/tmp/topology.db")
+        except: pass
+        cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
+    else:
+        cDB = libTopology.cacheDB(options, cfg, db, log)
     
     cDB.init()
     ## Los gehts
@@ -269,7 +241,30 @@ def eval_topo(options,cfg):
     topo.fixPositions()
     
     cDB.bkpDat()
-    print log
+
+
+def gui(qnib,opt):
+    from qnib_control import logC, log_entry
+    
+    logE = log_entry("Exec uptopo")
+    qnib.addLog(logE)
+    
+    cfg = libTopology.config([opt.cfgfile,],opt)
+    cfg.eval()
+    log = logC(opt,qnib)
+    eval_topo(opt, cfg, log)
+    
+    logE.set_status(log.get_status())
+    qnib.refresh_log()
+
+def main(argv=None):
+    options = libTopology.Parameter(argv)
+    options.check()
+    cfg = config([options.cfgfile,],options)
+    cfg.eval()
+    log = libTopology.logC(options, "/var/log/uptopo.log")
+    eval_topo(options, cfg, log)
+    
     
 if __name__ == "__main__":
     main()

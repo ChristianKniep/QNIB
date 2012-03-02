@@ -48,21 +48,15 @@ class config(object):
         else:           return self.data[section][option]
 
     
-def main(argv=None):
-    # Parameter
-    options = libTopology.Parameter(argv)
-    options.check()
-    
-    log = libTopology.logC("/var/log/create_netgrph.log")
-    
-    cfg = config([options.netcfg, options.topocfg], options)
-    cfg.eval()
+def create(options,cfg, log):
     
     db = dbCon.dbCon(options)
-    try: os.remove("/tmp/topology.db")
-    except: pass
-    cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
-    #cDB = libTopology.cacheDB(options, cfg, db, log)
+    if False:
+        try: os.remove("/tmp/topology.db")
+        except: pass
+        cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
+    else:
+        cDB = libTopology.cacheDB(options, cfg, db, log)
     
     # init with true clones topology also
     cDB.init(True)
@@ -74,7 +68,27 @@ def main(argv=None):
     
     # No Backup needed, we just use the DB
     #cDB.bkpDat()
-    print log
         
+def gui(qnib,opt):
+    from qnib_control import logC, log_entry
+    logE = log_entry("Exec create_netgraph")
+    qnib.addLog(logE)
+    
+    cfg = libTopology.config([opt.cfgfile,],opt)
+    cfg.eval()
+    log = logC(opt,qnib)
+    create(opt, cfg, log)
+    
+    logE.set_status(log.get_status())
+    qnib.refresh_log()
+    
+def main(argv=None):
+    options = libTopology.Parameter(argv)
+    options.check()
+    cfg = config([options.cfgfile,],options)
+    cfg.eval()
+    log = libTopology.logC("/var/log/create_netgraph.log")
+    create(options,cfg, log)
+    
 if __name__ == "__main__":
     main()
