@@ -11,6 +11,7 @@ INSERT INTO states (state_name) VALUES ('chk');
 INSERT INTO states (state_name) VALUES ('ok');
 INSERT INTO states (state_name) VALUES ('deg');
 INSERT INTO states (state_name) VALUES ('nok');
+INSERT INTO states (state_name) VALUES ('fail');
 
 /* perfkeys */
 INSERT INTO perfkeys (pk_name) VALUES ('symbol_err_cnt');

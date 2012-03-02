@@ -139,13 +139,15 @@ CREATE TABLE sg_nodes (
     n_id INTEGER,
     c_id INTEGER DEFAULT 0,
     gn_name varchar(64),
-    gn_pos varchar(64),
     gn_shape varchar(64),
-    gn_width varchar(64),
-    gn_height varchar(64),
-    gn_tooltip varchar(128),
-    gn_fontcolor varchar(128),
     in_topo boolean DEFAULT 'f'
+    );
+CREATE TABLE sgn_options (
+    sgno_id SERIAL PRIMARY KEY,
+    sgn_id INTEGER,
+    sgno_key varchar(56),
+    sgno_val varchar(255),
+    CONSTRAINT doppelcheck UNIQUE (sgn_id,sgno_key)
     );
 CREATE TABLE sg_edges (
     sge_id SERIAL PRIMARY KEY,
@@ -173,5 +175,16 @@ CREATE TABLE perfdata (
     pdat_time timestamp DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT perfdata_pk
         PRIMARY KEY (p_id,pk_id,pdat_time)
+);
+
+-- opensm
+CREATE TABLE traps (
+    trap_id SERIAL,
+    trap_type integer,
+    trap_event integer,
+    trap_lid integer,
+    trap_time timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT trap_pk
+        PRIMARY KEY (trap_id)
 );
 
