@@ -36,11 +36,11 @@ class ibsim(object):
         else:
             node = "\"%s\"" % host
         errc = self.child.sendline("unlink %s\r" % node)
-        if errc==17:
+        if errc==18:
             logE.set_desc("Unlink Host %s" % node)
             self.log("unlink switch %s finished" % host)
             logE.set_status("OK")
-        if errc==18:
+        elif errc==19:
             logE.set_desc("Unlink Switch %s" % node)
             self.log("unlink switch %s finished" % host)
             logE.set_status("OK")
@@ -55,7 +55,7 @@ class ibsim(object):
             node = "\"%s\"" % host
         logE.set_desc("Relink %s" % node)
         errc = self.child.sendline("relink %s\r" % node)
-        if errc==17:
+        if errc==19:
             logE.set_desc("Relink Switch %s" % node)
             logE.set_status("OK")
         elif errc==18:
