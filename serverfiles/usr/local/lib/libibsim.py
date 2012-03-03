@@ -41,7 +41,11 @@ class ibsim(object):
             self.log("unlink switch %s finished" % host)
             logE.set_status("OK")
         elif errc==19:
-            logE.set_desc("Unlink Switch %s" % node)
+            logE.set_desc("Unlink Edge %s" % node)
+            self.log("unlink switch %s finished" % host)
+            logE.set_status("OK")
+        elif errc==17:
+            logE.set_desc("Unlink Spine %s" % node)
             self.log("unlink switch %s finished" % host)
             logE.set_status("OK")
         else:
@@ -56,10 +60,13 @@ class ibsim(object):
         logE.set_desc("Relink %s" % node)
         errc = self.child.sendline("relink %s\r" % node)
         if errc==19:
-            logE.set_desc("Relink Switch %s" % node)
+            logE.set_desc("Relink Edge %s" % node)
             logE.set_status("OK")
         elif errc==18:
             logE.set_desc("Relink Host %s" % node)
+            logE.set_status("OK")
+        elif errc==17:
+            logE.set_desc("Relink Spine %s" % node)
             logE.set_status("OK")
         else:
             self.log("relink '%s' ended with abnormal rc '%s'" % (host,errc))

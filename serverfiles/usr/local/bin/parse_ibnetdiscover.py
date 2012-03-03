@@ -13,16 +13,16 @@ import libTopology
 
 class Parameter(object):
     def __init__(self):
-       # Parameterhandling
-       usageStr = "parse_ibnetdiscover [options]"
-       self.parser = OptionParser(usage=usageStr)
-       self.default()
+        # Parameterhandling
+        usageStr = "parse_ibnetdiscover [options]"
+        self.parser = OptionParser(usage=usageStr)
+        self.default()
+        self.extra()
+        (self.options, args) = self.parser.parse_args()
 
-       (self.options, args) = self.parser.parse_args()
-
-       # copy over all class.attributes
-       self.__dict__ = self.options.__dict__
-       self.args = args
+        # copy over all class.attributes
+        self.__dict__ = self.options.__dict__
+        self.args = args
     def default(self):
         # Default-Options
         self.parser.add_option("-d", action="count", dest="debug", help="increases debug [default:None, -d:1, -ddd: 3]")
@@ -37,6 +37,8 @@ class Parameter(object):
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
         self.parser.add_option("--db",dest="db",default=False, action = "store_true", help = "Show database debug information")
         self.parser.add_option("--force-uptopo",dest="force_uptopo",default=False, action = "store_true", help = "Force update of topology")
+    def extra(self):
+        pass 
     def check(self):
         if self.debug==None: self.debug = 0
         if self.lids:

@@ -354,7 +354,7 @@
                 <property name="n_columns">3</property>
                 <property name="homogeneous">True</property>
                 <child>
-                  <object class="GtkToggleButton" id="node11">
+                  <object class="GtkToggleButton" id="core1">
                     <property name="label" translatable="yes">core1</property>
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
@@ -364,7 +364,7 @@
                   </object>
                 </child>
                 <child>
-                  <object class="GtkToggleButton" id="node1">
+                  <object class="GtkToggleButton" id="spine1">
                     <property name="label" translatable="yes">spine1</property>
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
