@@ -34,6 +34,11 @@ class dbCon(object):
         #Destruktor kickt die DB-Handler / Cursor
         self.__cur.close()
         self.__con.close()
+    def close(self,name=None):
+        self.__cur.close()
+        self.__con.close()
+        if name:
+            print "%s> everything closed" % name
     def commit(self):
         if self.db: self.db.deb("Commit")
         self.__con.commit()
@@ -56,11 +61,6 @@ class dbCon(object):
         if self.db: self.db.deb(query,debug)
         self.__cur.execute(query)
         return self.__cur.fetchone()
-    def select(self,query,debug=3):
-        self.querys += 1
-        if self.db: self.db.deb(query,debug)
-        self.__cur.execute(query)
-        return self.__cur.fetchall()
     def getPID(self,node,pnr):
         query = "SELECT p_id FROM ports NATURAL JOIN nodes WHERE n_id='%s' AND p_int='%s'" % (node.n_id,pnr)
         res = self.sel(query)
@@ -69,7 +69,7 @@ class dbCon(object):
     def getRows(self,table,query,debug=3):
         try:
             self.querys += 1
-            return self.select(query,debug)
+            return self.sel(query,debug)
         except pgdb.DatabaseError,e:
             if self.db: self.db.deb(e,1)
             return [] 
@@ -137,7 +137,7 @@ class dbCon(object):
             sys.exit()
         query = "SELECT %s FROM %s WHERE %s" % (idName,table,where)
         if debug: print query
-        id = self.select(query)
+        id = self.sel(query)
         if id:
             if debug: print id[0][0]
             return id[0][0]
@@ -148,17 +148,18 @@ class dbCon(object):
         self.commit()
     def exe(self,query,debug=3):
         if self.db: self.db.deb(query,debug)
+        self.commit()
         self.__cur.execute(query)
         self.querys += 1
         self.commit()
     def updatePerfcache(self,portid,pkId,perf):
-        query = "select upsert_perfcache('%s', '%s','%s')" % (portid,pkId,int(perf))
+        query = "SELECT upsert_perfcache('%s', '%s','%s')" % (portid,pkId,int(perf))
     def deltaLoop(self,query,debug=3):
         L = True
         ret = []
         while L:
             self.commit()
-            res = self.select(query,debug)
+            res = self.sel(query,debug)
             if not res: L=False
             else:
                 ret.append(res[0])
@@ -192,7 +193,7 @@ class dbCon(object):
         query = "SELECT getPortID('%s','%s')" % (nId,port)
         return self.sel(query)[0][0]
     def getPortidDump(self,pId,pkId,dId):
-        query = "select * from getInsID_portidDumps(%s,%s,%s)" % (pId,pkId,dId)
+        query = "SELECT * FROM getInsID_portidDumps(%s,%s,%s)" % (pId,pkId,dId)
         if self.db: self.db.deb(query,debug)
         return self.sel(query)[0][0]
     def insGet_ID(self,table,where):
@@ -206,7 +207,7 @@ class dbCon(object):
         return self.sel(query)[0]
     def getStatesName(self):
         query = "SELECT state_id,state_name FROM states"
-        res = self.select(query)
+        res = self.sel(query)
         acc = {}
         for row in res:
             (state_id,state_name) = row
@@ -214,7 +215,7 @@ class dbCon(object):
         return acc
     def getStatesId(self):
         query = "SELECT state_id,state_name FROM states"
-        res = self.select(query)
+        res = self.sel(query)
         acc = {}
         for row in res:
             (state_id,state_name) = row
@@ -232,7 +233,6 @@ class dbCon(object):
             query =  "UPDATE nodes SET n_state_id='%s' WHERE n_id='%s';" % (n_state_new,n_id)
             query += "INSERT INTO node_history (n_id,nh_state_id,nh_message) VALUES ('%s','%s','%s->%s');" % (n_id,n_state_new,self.stateIds[n_state_old],self.stateIds[n_state_new])
             self.ins(query)
-            
     def setPortState(self,p_id,p_state_new):
         query = "SELECT p_state_id FROM ports WHERE p_id='%s'" % p_id
         p_state_old = self.selOne(query)[0]

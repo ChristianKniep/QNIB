@@ -519,15 +519,16 @@ class checks(object):
     def update_topo(self):
         # FIXME: Should we import here? Seems to be ugly..
         import uptopo
-        uptopo.eval_topo(self.opt,self.cfg)
+        uptopo.eval_topo(self.opt, self.db, self.cfg, self.log)
     def create_graphs(self):
         import create_netgraph
-        create_netgraph.create(self.opt, self.cfg)
+        create_netgraph.create(self.opt, self.db, self.cfg, self.log)
     def set_guiStuff(self,qnib):
         self.qnib = qnib
     
 def gui(qnib,opt):
     from qnib_control import logC, log_entry
+    
     
     logE = log_entry("Exec parse_ibnetdiscover")
     qnib.addLog(logE)
@@ -551,7 +552,7 @@ def gui(qnib,opt):
     else:
         log.debug("No traps detected...",1)
     chk.gui_log(logE)
-        
+
     
     
 def main():
@@ -578,13 +579,17 @@ def main():
             # -> A new node appears
             # -> User removed a node for good
             chk.update_topo()
+        else:
+            log.debug("%s Traps detected..." % len(trap_dict),0)
+            
         # we sure should redraw the graph to visualize the traffic
         chk.create_graphs()
         chk.dump_log()
         # If we are not suppose to loop the script, we break
         if not options.loop:
             break
-        time.sleep(options.loop_delay)
+        del db
+        time.sleep(int(options.loop_delay))
     ec=chk.getEC()
     sys.exit(ec)
 

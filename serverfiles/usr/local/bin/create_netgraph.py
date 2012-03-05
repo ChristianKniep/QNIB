@@ -48,9 +48,8 @@ class config(object):
         else:           return self.data[section][option]
 
     
-def create(options,cfg, log):
+def create(options,db, cfg, log):
     
-    db = dbCon.dbCon(options)
     if False:
         try: os.remove("/tmp/topology.db")
         except: pass
@@ -68,6 +67,7 @@ def create(options,cfg, log):
     
     # No Backup needed, we just use the DB
     #cDB.bkpDat()
+    #db.close("create_netgraph")
         
 def gui(qnib,opt):
     from qnib_control import logC, log_entry
@@ -77,7 +77,8 @@ def gui(qnib,opt):
     cfg = libTopology.config([opt.cfgfile,],opt)
     cfg.eval()
     log = logC(opt,qnib)
-    create(opt, cfg, log)
+    db = dbCon.dbCon(opt)
+    create(opt, db, cfg, log)
     
     logE.set_status(log.get_status())
     qnib.refresh_log()
@@ -85,10 +86,13 @@ def gui(qnib,opt):
 def main(argv=None):
     options = libTopology.Parameter(argv)
     options.check()
+    
+    db = dbCon.dbCon(options)
+    
     cfg = config([options.cfgfile,],options)
     cfg.eval()
     log = libTopology.logC("/var/log/create_netgraph.log")
-    create(options,cfg, log)
+    create(options,db, cfg, log)
     
 if __name__ == "__main__":
     main()

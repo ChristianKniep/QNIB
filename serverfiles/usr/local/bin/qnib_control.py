@@ -7,13 +7,12 @@ import sys
 import copy
 import time
 import re
+import random
 
 sys.path.append("/root/QNIB/serverfiles/usr/local/lib/")
 import libibsim
 sys.path.append("/root/QNIB/serverfiles/usr/local/bin/")
-import parse_ibnetdiscover
-import uptopo
-import create_netgraph
+from parse_ibnetdiscover import Parameter
 
 class logC(object):
     def __init__(self, opt, qnib):
@@ -62,6 +61,8 @@ class log_entry(object):
         self.status = ""
     def set_status(self,status):
         self.status = status.strip()
+    def add_status(self,msg):
+        self.status += msg
     def set_desc(self,desc):
         self.desc = desc.strip()
     def __str__(self):
@@ -78,12 +79,14 @@ class MyApp(object):
         self.builder = gtk.Builder()
         self.builder.add_from_file("/root/QNIB/serverfiles/usr/local/etc/ibsim.ui")
         self.builder.connect_signals(self)
-        self.ibs = libibsim.ibsim("/root/QNIB/serverfiles/test/netlist.clos5")
         self.log_win = self.builder.get_object("log")
         self.log_buffer = self.log_win.get_buffer()
+        self.log_buffer.set_text("starting")
         font_desc=pango.FontDescription('Courier 10')
         self.log_win.modify_font(font_desc)
 
+        self.ibs = libibsim.ibsim("/root/QNIB/serverfiles/test/netlist.clos5")
+        
         logE = log_entry("")
         self.log_text = [logE]*10
         self.start_services()
@@ -102,7 +105,38 @@ class MyApp(object):
         ibsim_but.set_active(True)
         ibsim_but = self.builder.get_object("opensm")
         ibsim_but.set_active(True)
-    def start_service(self,opt):
+    def start_simulation(self,opt):
+        mat = re.search("(\d+)",opt.get_name())
+        if mat:
+            steps = int(mat.group(1))
+            logE = log_entry("Starting %s Sim-Steps" % steps)
+            self.addLog(logE)
+            while steps>0:
+                steps -= 1
+                self.rand_press()
+                time.sleep(5)
+        else:
+            while True:
+                self.rand_press()
+                time.sleep(5)
+    def rand_press(self):
+        node = self.get_randNode()
+        node_obj = self.builder.get_object(node)
+        if node_obj.get_active():
+            print "%s is active" % node
+            node_obj.set_active(False)
+        else:
+            print "%s is inactive" % node
+            node_obj.set_active(True)
+        node_obj.queue_draw()
+    def get_randNode(self,blacklist=[]):
+        just_nodes = set(self.node_list.keys()) - set(self.sw_list)
+        nodes = set([x for x in list(just_nodes) if self.node_list[x]['blocked'] in [0,1]])
+        whitelist = list(nodes - set(blacklist))
+        index = random.randint(0,len(whitelist)-1)
+        rand_node = whitelist[index]
+        return rand_node
+    def switch_service(self,opt):
         if opt.get_name()=='ibsim':
             self.ibsim(opt.get_active())
         elif opt.get_name()=='opensm':
@@ -130,13 +164,15 @@ class MyApp(object):
         node = opt.get_name()
         node_obj = self.builder.get_object(node)
         if opt.get_active():
-            logE = log_entry("Relink %s" % node)
-            self.addLog(logE)
             if self.node_list[node]['blocked']==2:
+                logE = log_entry("Relink %s" % node)
+                self.addLog(logE)
                 logE.set_status("BLOCKED")
                 node_obj.set_active(False)
             elif self.node_list[node]['blocked']==1:
                 """ I am the root, so unblock me """
+                logE = log_entry("Relink %s" % node)
+                self.addLog(logE)
                 self.node_list[node]['blocked'] = 0
                 res = self.ibs.relink(logE, node)
                 """ And pimp me childs to let them think they are root """
@@ -156,18 +192,19 @@ class MyApp(object):
                 self.node_list[node]['blocked'] = 1
                 res = self.ibs.unlink(logE, node)
             else:
+                logE = log_entry("Unlink %s" % node)
+                self.addLog(logE)
                 logE.set_status("BLOCKED")
             self.block_recursiv(node)
         self.refresh_log()
     def set_blocker(self,node):
         for child_name in self.node_list[node]['childs']:
             self.node_list[child_name]['blocked'] = 1
-            
     def block_recursiv(self,node,parent=None):
         for child_name in self.node_list[node]['childs']:
             """ If Child is not blocked, we press/block it"""
             if self.node_list[child_name]['blocked']==0:
-                print "Releasing childs button: '%s'->'%s'" % (node,child_name)
+                #print "Releasing childs button: '%s'->'%s'" % (node,child_name)
                 self.node_list[child_name]['blocked'] = 2
                 self.node_list[child_name]['bocker'] = node
                 child_obj = self.builder.get_object(child_name)
@@ -177,24 +214,12 @@ class MyApp(object):
         for child_name in self.node_list[node]['childs']:
             """ If Child is blocked, we release/unblock it"""
             if self.node_list[child_name]['blocked']==1:
-                print "Pressing childs button: '%s'->'%s'" % (node,child_name)
+                #print "Pressing childs button: '%s'->'%s'" % (node,child_name)
                 child_obj = self.builder.get_object(child_name)
                 child_obj.set_active(True)
                 self.node_list[child_name]['bocker'] = None
                 self.node_list[child_name]['blocked'] = 0
                 self.unblock_recursiv(child_name)
-    def exec_script(self,opt):
-        script = opt.get_name()
-        if script=="parse_ibnetdiscover":
-            parse_ibnetdiscover.gui(self,self.opt)
-        elif script=="uptopo":
-            uptopo.gui(self,self.opt)
-        elif script=="create_netgraph":
-            create_netgraph.gui(self,self.opt)
-        if script=="complete_run":
-            parse_ibnetdiscover.gui(self,self.opt)
-            uptopo.gui(self,self.opt)
-            create_netgraph.gui(self,self.opt)
     def on_window1_delete_event(self, *args):
         self.quit()
     def eval_netlist(self):
@@ -222,28 +247,35 @@ class MyApp(object):
     def add_child(self,sw_name, sw_port, dst_name, dst_port):
         if dst_name not in self.node_list.keys():
             """ Destination was not seen yet, must be a child """
-            print "'%s' is not in node_list, must be a child of '%s'" % (dst_name,sw_name)
+            #print "'%s' is not in node_list, must be a child of '%s'" % (dst_name,sw_name)
             self.node_list[sw_name]['childs'].append(dst_name)
-            print self.node_list[sw_name]['childs']
         else:
             """ Destination is in Nodelist, so it is possible that
             - it is an uplink switch and should not be linked as a child"""
             if sw_name not in self.node_list[dst_name]['childs']:
                 self.node_list[sw_name]['childs'].append(dst_name)
             else:
-                print "'%s' is an uplink switch of '%s'" % (dst_name, sw_name) 
-    def del_uplinks(self, sw_name, sw_port):
-        if sw_name!=None:
-            if self.node_list[sw_name][sw_port][dst_name]:
-                if k in self.sw_list:
-                    print "--",k
+                #print "'%s' is an uplink switch of '%s'" % (dst_name, sw_name)
+                pass    
     def print_netlist(self):
         for node_name,v in self.node_list.items():
             print "# %s" % node_name
             for k1,v1 in v.items():
                 print k1,v1
-
-class my_parameter(parse_ibnetdiscover.Parameter):
+    def exec_script(self,opt):
+        script = opt.get_name()
+        if script=="parse_ibnetdiscover":
+            parse_ibnetdiscover.gui(self,self.opt)
+        elif script=="uptopo":
+            uptopo.gui(self,self.opt)
+        elif script=="create_netgraph":
+            create_netgraph.gui(self,self.opt)
+        if script=="complete_run":
+            parse_ibnetdiscover.gui(self,self.opt)
+            uptopo.gui(self,self.opt)
+            create_netgraph.gui(self,self.opt)
+            
+class my_parameter(Parameter):
     def extra(self):
         self.parser.add_option("-n",
                                dest="netlist",

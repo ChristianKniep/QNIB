@@ -221,9 +221,8 @@ class graphSys(object):
     def isSwitch(self):
         return self.nt_name=="switch"
     
-def eval_topo(options,cfg,log):
+def eval_topo(options,db,cfg,log):
     
-    db = dbCon.dbCon(options)
     if False:
         try: os.remove("/tmp/topology.db")
         except: pass
@@ -242,9 +241,10 @@ def eval_topo(options,cfg,log):
     
     cDB.bkpDat()
 
-
 def gui(qnib,opt):
     from qnib_control import logC, log_entry
+    
+    db = dbCon.dbCon(opt)
     
     logE = log_entry("Exec uptopo")
     qnib.addLog(logE)
@@ -252,18 +252,25 @@ def gui(qnib,opt):
     cfg = libTopology.config([opt.cfgfile,],opt)
     cfg.eval()
     log = logC(opt,qnib)
-    eval_topo(opt, cfg, log)
+    eval_topo(opt, db, cfg, log)
     
     logE.set_status(log.get_status())
     qnib.refresh_log()
+    
+    #db.close("eval_topo")
 
 def main(argv=None):
     options = libTopology.Parameter(argv)
     options.check()
+    
+    db = dbCon.dbCon(opt)
+    
     cfg = config([options.cfgfile,],options)
     cfg.eval()
     log = libTopology.logC(options, "/var/log/uptopo.log")
-    eval_topo(options, cfg, log)
+    eval_topo(options, db, cfg, log)
+    
+    #db.close("eval_topo")
     
     
 if __name__ == "__main__":
