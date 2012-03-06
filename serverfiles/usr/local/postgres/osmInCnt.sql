@@ -29,7 +29,7 @@ CREATE OR REPLACE FUNCTION osmInAllErrCnt(text,int,int,
     BEGIN
         -- Get key informations to insert the key/value pair 
         SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
-        
+
         IF $4>0 THEN
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name='symbol_err_cnt' ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
@@ -73,6 +73,41 @@ CREATE OR REPLACE FUNCTION osmInAllErrCnt(text,int,int,
 $$ LANGUAGE 'plpgsql';
 
 CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
+                    bigint, bigint)
+                RETURNS VOID AS $$
+/* IN:  NodeGUID,PortNr,time_diff since last insert,
+ *              xmit_data,
+ *              rcv_data,
+ *              
+ * OUT: void
+ */
+    DECLARE
+        pk          intval%ROWTYPE;
+        pd          intval%ROWTYPE;
+        ports       intval%ROWTYPE;
+    BEGIN
+        -- Get key informations to insert the key/value pair 
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        
+        IF ports.val IS NOT NULL THEN
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name='xmit_data' ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$4);
+            ELSE
+                UPDATE perfdata SET pdat_val=$4, pdat_time=NOW() WHERE pd_id=pd.val;
+            END IF;
+       
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name='rcv_data' ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5);
+            ELSE
+                UPDATE perfdata SET pdat_val=$5, pdat_time=NOW() WHERE pd_id=pd.val;
+            END IF;
+        END IF;
+    END;
+$$ LANGUAGE 'plpgsql';CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
                     bigint, bigint, bigint, bigint)
                 RETURNS VOID AS $$
 /* IN:  NodeGUID,PortNr,time_diff since last insert,
