@@ -540,8 +540,9 @@ class node(object):
         res = self.db.selOne(statQ)
         s_rev = res[0]
         self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id,c_id,s_id,s_rev,n_id)
-        self.nodeOpts['URL'] = "None"
-        
+        self.nodeOpts['URL'] = "\"%s.html\"" % self.name
+        self.nodeOpts['target'] = "\"Nodes\""
+
         if not self.nodeOpts['shape']:
             if self.nt_name=='switch':
                 self.nodeOpts['shape']  = 'octagon'
@@ -2028,9 +2029,9 @@ class Parameter(object):
             action="count",
             dest="debug",
             help="increases debug [default:None, -d:1, -ddd: 3]")
-        self.parser.add_option("-c", dest="netcfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Network configfile (default: %default)")
+        self.parser.add_option("-C", dest="netcfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Network configfile (default: %default)")
         self.parser.add_option("-t", dest="topocfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/topology.cfg", action = "store", help = "Topology configfile (default: %default)")
-        self.parser.add_option("-C", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
+        self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
         self.parser.add_option("--circle",dest="circle",default=False, action = "store_true", help = "Show circle debug information")
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
