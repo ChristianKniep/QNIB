@@ -4,7 +4,6 @@
 import gtk
 import pango
 import sys
-import copy
 import time
 import re
 import random
@@ -14,63 +13,70 @@ import libibsim
 sys.path.append("/root/QNIB/serverfiles/usr/local/bin/")
 from parse_ibnetdiscover import Parameter
 
-class logC(object):
+class LOG(object):
     def __init__(self, opt, qnib):
         self.opt    = opt
         self.qnib   = qnib
-        self.statusList = []
-        self.perfList   = []
-        self.retEC = 0
-        self.s = {}
+        self.status_list = []
+        self.perf_list   = []
+        self.ret_ec = 0
+        self.stat_dict = {}
         self.res  = {}
-    def addPerf(self,key,val):
-        self.perfList.append("%s=%s" % (key,val))
-        if val!=0:
-            self.statusList.append("%sms %s" % (val,key))
+    def add_perf(self, key, val):
+        self.perf_list.append("%s=%s" % (key, val))
+        if val != 0:
+            self.status_list.append("%sms %s" % (val, key))
     def __str__(self):
-        if   self.retEC==0: retTXT = "OK"
-        elif self.retEC==1: retTXT = "WARN"
-        elif self.retEC==2: retTXT = "CRIT"
-        retTXT += " - %s | %s" % (", ".join(self.statusList),", ".join(self.perfList))
-        return retTXT
+        if   self.ret_ec == 0:
+            ret_txt = "OK"
+        elif self.ret_ec == 1:
+            ret_txt = "WARN"
+        elif self.ret_ec == 2:
+            ret_txt = "CRIT"
+        ret_txt += " - % s  | %s" % (", ".join(self.status_list), \
+                                     ", ".join(self.perf_list))
+        return ret_txt
     def get_status(self):
-        return ", ".join(self.statusList)
-    def getEC(self):
-        return self.retEC
-    def start(self,stat):
-        if not self.res.has_key(stat): self.res[stat] = 0
-        self.s[stat] = time.time()
-    def end(self,stat):
-        e = time.time()
-        self.res[stat] += int((e - self.s[stat])*1000)
-        self.s[stat] = 0
-    def finish(self,stat):
-        self.addPerf(stat,self.res[stat])
+        return ", ".join(self.status_list)
+    def get_ec(self):
+        return self.ret_ec
+    def start(self, stat):
+        if not self.res.has_key(stat):
+            self.res[stat] = 0
+        self.stat_dict[stat] = time.time()
+    def end(self, stat):
+        end = time.time()
+        self.res[stat] += int((end - self.stat_dict[stat])*1000)
+        self.stat_dict[stat] = 0
+    def finish(self, stat):
+        self.add_perf(stat, self.res[stat])
         self.res[stat] = 0
     def debug(self, msg, deb=3):
-        if self.opt.debug>=deb:
-            logE = log_entry(msg)
-            self.qnib.addLog(logE)
+        if self.opt.debug >= deb:
+            log_e = LOGentry(msg)
+            self.qnib.add_log(log_e)
             self.qnib.refresh_log()
-    def get_statusList(self):
-        return self.statusList
+    def get_status_list(self):
+        return self.status_list
 
-class log_entry(object):
-    def __init__(self,desc):
+
+class LOGentry(object):
+    def __init__(self, desc):
         self.desc   = desc.strip()
         self.status = ""
-    def set_status(self,status):
+    def set_status(self, status):
         self.status = status.strip()
-    def add_status(self,msg):
+    def add_status(self, msg):
         self.status += msg
-    def set_desc(self,desc):
+    def set_desc(self, desc):
         self.desc = desc.strip()
     def __str__(self):
-        if self.status!="":
-            res = "%s : %s" % (self.desc.ljust(25),self.status)
+        if self.status != "":
+            res = "%s : %s" % (self.desc.ljust(25), self.status)
         else:
             res = self.desc
         return res
+
 
 class MyApp(object):
     def __init__(self, opt):
@@ -79,16 +85,16 @@ class MyApp(object):
         self.builder = gtk.Builder()
         self.builder.add_from_file("/root/QNIB/serverfiles/usr/local/etc/ibsim.ui")
         self.builder.connect_signals(self)
-        self.log_win = self.builder.get_object("log")
-        self.log_buffer = self.log_win.get_buffer()
+        log_win = self.builder.get_object("log")
+        self.log_buffer = log_win.get_buffer()
         self.log_buffer.set_text("starting")
-        font_desc=pango.FontDescription('Courier 10')
-        self.log_win.modify_font(font_desc)
+        font_desc = pango.FontDescription('Courier 10')
+        log_win.modify_font(font_desc)
 
-        self.ibs = libibsim.ibsim("/root/QNIB/serverfiles/test/netlist.clos5")
+        self.ibs = libibsim.IBsim("/root/QNIB/serverfiles/test/netlist.clos5")
         
-        logE = log_entry("")
-        self.log_text = [logE]*10
+        log_e = LOGentry("")
+        self.log_text = [log_e]*10
         self.start_services()
     def run(self):
         try:
@@ -105,13 +111,13 @@ class MyApp(object):
         ibsim_but.set_active(True)
         ibsim_but = self.builder.get_object("opensm")
         ibsim_but.set_active(True)
-    def start_simulation(self,opt):
-        mat = re.search("(\d+)",opt.get_name())
+    def start_simulation(self, opt):
+        mat = re.search("(\d+)", opt.get_name())
         if mat:
             steps = int(mat.group(1))
-            logE = log_entry("Starting %s Sim-Steps" % steps)
-            self.addLog(logE)
-            while steps>0:
+            log_e = LOGentry("Starting %s Sim-Steps" % steps)
+            self.add_log(log_e)
+            while steps > 0:
                 steps -= 1
                 self.rand_press()
                 time.sleep(5)
@@ -120,7 +126,7 @@ class MyApp(object):
                 self.rand_press()
                 time.sleep(5)
     def rand_press(self):
-        node = self.get_randNode()
+        node = self.get_rand_node()
         node_obj = self.builder.get_object(node)
         if node_obj.get_active():
             print "%s is active" % node
@@ -129,91 +135,97 @@ class MyApp(object):
             print "%s is inactive" % node
             node_obj.set_active(True)
         node_obj.queue_draw()
-    def get_randNode(self,blacklist=[]):
+    def get_rand_node(self, blacklist=None):
+        if blacklist == None:
+            blacklist = []
         just_nodes = set(self.node_list.keys()) - set(self.sw_list)
-        nodes = set([x for x in list(just_nodes) if self.node_list[x]['blocked'] in [0,1]])
+        nodes = set([x for x in list(just_nodes) if self.node_list[x]['blocked'] in [0, 1]])
         whitelist = list(nodes - set(blacklist))
-        index = random.randint(0,len(whitelist)-1)
+        index = random.randint(0, len(whitelist)-1)
         rand_node = whitelist[index]
         return rand_node
-    def switch_service(self,opt):
+    def switch_service(self, opt):
         if opt.get_name()=='ibsim':
             self.ibsim(opt.get_active())
         elif opt.get_name()=='opensm':
             self.opensm(opt.get_active())
-    def ibsim(self,start=True):
-        if start: logE = log_entry("Starting ibsim")
-        else: logE = log_entry("Stoping ibsim")
-        self.addLog(logE)
-        self.ibs.service_ibsim(logE, start)
+    def ibsim(self, start=True):
+        if start:
+            log_e = LOGentry("Starting ibsim")
+        else:
+            log_e = LOGentry("Stoping ibsim")
+        self.add_log(log_e)
+        self.ibs.service_ibsim(log_e, start)
         self.refresh_log()
-    def opensm(self,start=True):
-        if start: logE = log_entry("Starting opensm")
-        else: logE = log_entry("Stoping opensm")
-        self.addLog(logE)
-        self.ibs.service_opensm(logE, start)
+    def opensm(self, start=True):
+        if start:
+            log_e = LOGentry("Starting opensm")
+        else:
+            log_e = LOGentry("Stoping opensm")
+        self.add_log(log_e)
+        self.ibs.service_opensm(log_e, start)
         self.refresh_log()
-    def addLog(self,logE):
-        self.log_text.append(logE)
+    def add_log(self, log_e):
+        self.log_text.append(log_e)
         self.refresh_log()
     def refresh_log(self):
-        logList = [x.__str__() for x in self.log_text[-10:]]
-        logList.reverse()
-        self.log_buffer.set_text("\n".join(logList))
-    def node_toggled(self,opt):
+        log_list = [x.__str__() for x in self.log_text[-10:]]
+        log_list.reverse()
+        self.log_buffer.set_text("\n".join(log_list))
+    def node_toggled(self, opt):
         node = opt.get_name()
         node_obj = self.builder.get_object(node)
         if opt.get_active():
-            if self.node_list[node]['blocked']==2:
-                logE = log_entry("Relink %s" % node)
-                self.addLog(logE)
-                logE.set_status("BLOCKED")
+            if self.node_list[node]['blocked'] == 2:
+                log_e = LOGentry("Relink %s" % node)
+                self.add_log(log_e)
+                log_e.set_status("BLOCKED")
                 node_obj.set_active(False)
-            elif self.node_list[node]['blocked']==1:
-                """ I am the root, so unblock me """
-                logE = log_entry("Relink %s" % node)
-                self.addLog(logE)
+            elif self.node_list[node]['blocked'] == 1:
+                # I am the root, so unblock me 
+                log_e = LOGentry("Relink %s" % node)
+                self.add_log(log_e)
                 self.node_list[node]['blocked'] = 0
-                res = self.ibs.relink(logE, node)
-                """ And pimp me childs to let them think they are root """
+                self.ibs.relink(log_e, node)
+                # And pimp me childs to let them think they are root 
                 self.set_blocker(node)                
                 self.unblock_recursiv(node)
             else:
-                """ I am not block, so unblock me """
+                # I am not block, so unblock me 
                 self.node_list[node]['blocked'] = 0
-                res = self.ibs.relink(logE, node)
+                self.ibs.relink(log_e, node)
                 self.unblock_recursiv(node)
         else:
-            if self.node_list[node]['blocked']==2:
+            if self.node_list[node]['blocked'] == 2:
                 pass
-            elif self.node_list[node]['blocked']==0:
-                logE = log_entry("Unlink %s" % node)
-                self.addLog(logE)
+            elif self.node_list[node]['blocked'] == 0:
+                log_e = LOGentry("Unlink %s" % node)
+                self.add_log(log_e)
                 self.node_list[node]['blocked'] = 1
-                res = self.ibs.unlink(logE, node)
+                self.ibs.unlink(log_e, node)
             else:
-                logE = log_entry("Unlink %s" % node)
-                self.addLog(logE)
-                logE.set_status("BLOCKED")
+                log_e = LOGentry("Unlink %s" % node)
+                self.add_log(log_e)
+                log_e.set_status("BLOCKED")
             self.block_recursiv(node)
         self.refresh_log()
-    def set_blocker(self,node):
+    def set_blocker(self, node):
         for child_name in self.node_list[node]['childs']:
             self.node_list[child_name]['blocked'] = 1
-    def block_recursiv(self,node,parent=None):
+    def block_recursiv(self, node, parent=None):
+        """ If Child is not blocked, we press/block it """
         for child_name in self.node_list[node]['childs']:
-            """ If Child is not blocked, we press/block it"""
-            if self.node_list[child_name]['blocked']==0:
+            if self.node_list[child_name]['blocked'] == 0:
                 #print "Releasing childs button: '%s'->'%s'" % (node,child_name)
                 self.node_list[child_name]['blocked'] = 2
                 self.node_list[child_name]['bocker'] = node
                 child_obj = self.builder.get_object(child_name)
                 child_obj.set_active(False)
                 self.block_recursiv(child_name, node)
-    def unblock_recursiv(self,node):
+    def unblock_recursiv(self, node):
+        """ If Child is blocked, we release/unblock it"""
         for child_name in self.node_list[node]['childs']:
-            """ If Child is blocked, we release/unblock it"""
-            if self.node_list[child_name]['blocked']==1:
+            if self.node_list[child_name]['blocked'] == 1:
                 #print "Pressing childs button: '%s'->'%s'" % (node,child_name)
                 child_obj = self.builder.get_object(child_name)
                 child_obj.set_active(True)
@@ -237,16 +249,16 @@ class MyApp(object):
                 sw_name = mat_switch.group(1)
                 self.sw_list.append(sw_name)
                 self.node_list[sw_name] = {'blocked':0, 'blocker':None, 'childs':[]}
-            elif mat_switchport and sw_name!=None:
+            elif mat_switchport and sw_name != None:
                 (sw_port, dst_name, dst_port) = mat_switchport.groups()
                 if not self.node_list.has_key(dst_name):
                     self.node_list[dst_name] = {'blocked':0, 'blocker':None, 'childs':[]}
-                self.add_child(sw_name,sw_port,dst_name,dst_port)
+                self.add_child(sw_name, sw_port, dst_name, dst_port)
             if mat_host:
                 sw_name = None
-    def add_child(self,sw_name, sw_port, dst_name, dst_port):
+    def add_child(self, sw_name, sw_port, dst_name, dst_port):
+        """ Destination was not seen yet, must be a child """
         if dst_name not in self.node_list.keys():
-            """ Destination was not seen yet, must be a child """
             #print "'%s' is not in node_list, must be a child of '%s'" % (dst_name,sw_name)
             self.node_list[sw_name]['childs'].append(dst_name)
         else:
@@ -258,33 +270,21 @@ class MyApp(object):
                 #print "'%s' is an uplink switch of '%s'" % (dst_name, sw_name)
                 pass    
     def print_netlist(self):
-        for node_name,v in self.node_list.items():
+        for node_name, val in self.node_list.items():
             print "# %s" % node_name
-            for k1,v1 in v.items():
-                print k1,v1
-    def exec_script(self,opt):
-        script = opt.get_name()
-        if script=="parse_ibnetdiscover":
-            parse_ibnetdiscover.gui(self,self.opt)
-        elif script=="uptopo":
-            uptopo.gui(self,self.opt)
-        elif script=="create_netgraph":
-            create_netgraph.gui(self,self.opt)
-        if script=="complete_run":
-            parse_ibnetdiscover.gui(self,self.opt)
-            uptopo.gui(self,self.opt)
-            create_netgraph.gui(self,self.opt)
+            for key1, val1 in val.items():
+                print key1, val1
             
-class my_parameter(Parameter):
+class MYparameter(Parameter):
     def extra(self):
         self.parser.add_option("-n",
-                               dest="netlist",
-                               default="/root/QNIB/serverfiles/test/netlist.clos5",
-                               action = "store",
-                               help = "Netlist-File to parse and simulate (default: %default)")    
+            dest="netlist",
+            default="/root/QNIB/serverfiles/test/netlist.clos5",
+            action = "store",
+            help = "Netlist-File to parse and simulate (default: %default)")
 
 if __name__ == '__main__':
-    options = my_parameter()
+    options = MYparameter()
     options.check()
     app = MyApp(options)
     if False:
