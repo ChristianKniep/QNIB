@@ -107,6 +107,7 @@ CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
             END IF;
         END IF;
     END;
+    
 $$ LANGUAGE 'plpgsql';CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
                     bigint, bigint, bigint, bigint)
                 RETURNS VOID AS $$
@@ -159,6 +160,129 @@ $$ LANGUAGE 'plpgsql';CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
                 UPDATE perfdata SET pdat_val=$7,pdat_time=NOW() WHERE pd_id=pd.val;
             END IF;
             
+        END IF;
+    END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint)
+                RETURNS VOID AS $$
+/* IN:  NodeGUID,PortNr,time_diff since last insert,
+ *      (key,val)*1
+ * OUT: void
+ */
+    DECLARE
+        pk          intval%ROWTYPE;
+        pd          intval%ROWTYPE;
+        ports       intval%ROWTYPE;
+    BEGIN
+        -- Get key informations to insert the key/value pair 
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        
+        IF ports.val IS NOT NULL THEN
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            
+        END IF;
+    END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
+                                                         text, bigint)
+                RETURNS VOID AS $$
+/* IN:  NodeGUID,PortNr,time_diff since last insert,
+ *      (key,val)*2
+ * OUT: void
+ */
+    DECLARE
+        pk          intval%ROWTYPE;
+        pd          intval%ROWTYPE;
+        ports       intval%ROWTYPE;
+    BEGIN
+        -- Get key informations to insert the key/value pair 
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        
+        IF ports.val IS NOT NULL THEN
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+       
+        END IF;
+    END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
+                                                         text, bigint,
+                                                         text, bigint
+                                                         )
+                RETURNS VOID AS $$
+/* IN:  NodeGUID,PortNr,time_diff since last insert,
+ *      (key,val)*3
+ * OUT: void
+ */
+    DECLARE
+        pk          intval%ROWTYPE;
+        pd          intval%ROWTYPE;
+        ports       intval%ROWTYPE;
+    BEGIN
+        -- Get key informations to insert the key/value pair 
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        
+        IF ports.val IS NOT NULL THEN
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$8 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$9/$3);
+       
+        END IF;
+    END;
+$$ LANGUAGE 'plpgsql';
+CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
+                                                         text, bigint,
+                                                         text, bigint,
+                                                         text, bigint
+                                                         )
+                RETURNS VOID AS $$
+/* IN:  NodeGUID,PortNr,time_diff since last insert,
+ *      (key,val)*4
+ * OUT: void
+ */
+    DECLARE
+        pk          intval%ROWTYPE;
+        pd          intval%ROWTYPE;
+        ports       intval%ROWTYPE;
+    BEGIN
+        -- Get key informations to insert the key/value pair 
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        
+        IF ports.val IS NOT NULL THEN
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$8 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$9/$3);
+            
+            SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$10 ORDER BY pk_id LIMIT 1;
+            SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
+            INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$11/$3);
+       
         END IF;
     END;
 $$ LANGUAGE 'plpgsql';

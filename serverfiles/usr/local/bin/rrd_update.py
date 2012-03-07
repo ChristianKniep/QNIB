@@ -22,6 +22,90 @@ class MYparameter(libTopology.Parameter):
         self.parser.add_option("-c", dest="cfgfile",
                     default="/root/QNIB/serverfiles/usr/local/etc/default.cfg",
                     action = "store", help = "Configfile (default: %default)")
+        
+
+def update_err(opt, datab, interval):
+    ## Err
+    query = """SELECT   pd_id, n_name, p_ext, EXTRACT(EPOCH FROM pdat_time),
+                        pk_name, pdat_val
+                FROM perfdata   NATURAL JOIN perfkeys
+                        NATURAL JOIN ports
+                        NATURAL JOIN nodes
+                WHERE pk_name in (
+                    'symbol_err_cnt', 'xmit_discards',
+                    'vl15_dropped', 'link_downed'
+                    )
+                ORDER BY pd_id ASC LIMIT 500"""
+    res = datab.sel(query)
+    data = {}
+    pd_ids = []
+    count_res = len(res)
+    if count_res == 0:
+        return count_res
+    for row in res:
+        (pd_id, n_name, p_ext, pdat_time, pk_name, pdat_val) = row
+        pd_ids.append(str(pd_id))
+        time_s = int(pdat_time)
+        if n_name not in data.keys():
+            data[n_name] = {}
+        if p_ext not in data[n_name].keys():
+            data[n_name][p_ext] = {}
+        if time_s not in data[n_name][p_ext].keys():
+            data[n_name][p_ext][time_s] = {}
+        data[n_name][p_ext][time_s][pk_name] = pdat_val
+    query = "DELETE FROM perfdata WHERE pd_id in ('%s')" % "','".join(pd_ids)
+    datab.exe(query)
+    
+    for node, ports in data.items():
+        for p_ext, time_stamps in ports.items():
+            rrd_file = "%s_%s" % (node, p_ext)
+            my_rrd = rrd.RRD(rrd_file)
+            stamps = time_stamps.keys()
+            stamps.sort()
+            my_rrd.create_err(interval, stamps[0])
+            ins = data[node][p_ext]
+            my_rrd.update_err(ins)
+    return count_res
+
+def update_perf(opt, datab, interval):
+    ## Perf
+    query = """SELECT   pd_id, n_name, p_ext, EXTRACT(EPOCH FROM pdat_time),
+                        pk_name, pdat_val
+                FROM perfdata   NATURAL JOIN perfkeys
+                        NATURAL JOIN ports
+                        NATURAL JOIN nodes
+                WHERE pk_name in ('xmit_data', 'rcv_data')
+                ORDER BY pd_id ASC LIMIT 500"""
+    res = datab.sel(query)
+    data = {}
+    pd_ids = []
+    count_res = len(res)
+    if count_res == 0:
+        return count_res
+    for row in res:
+        (pd_id, n_name, p_ext, pdat_time, pk_name, pdat_val) = row
+        pd_ids.append(str(pd_id))
+        time_s = int(pdat_time)
+        if n_name not in data.keys():
+            data[n_name] = {}
+        if p_ext not in data[n_name].keys():
+            data[n_name][p_ext] = {}
+        if time_s not in data[n_name][p_ext].keys():
+            data[n_name][p_ext][time_s] = {}
+        data[n_name][p_ext][time_s][pk_name] = pdat_val
+    query = "DELETE FROM perfdata WHERE pd_id in ('%s')" % "','".join(pd_ids)
+    datab.exe(query)
+    
+    for node, ports in data.items():
+        for p_ext, time_stamps in ports.items():
+            rrd_file = "%s_%s" % (node, p_ext)
+            my_rrd = rrd.RRD(rrd_file)
+            stamps = time_stamps.keys()
+            stamps.sort()
+            my_rrd.create_perf(interval, stamps[0])
+            ins = data[node][p_ext]
+            my_rrd.update_perf(ins)
+    return count_res
 
 
 def main(argv=None):
@@ -30,44 +114,15 @@ def main(argv=None):
     
     datab = dbCon.dbCon(opt)
     interval = 10
+    count_res = 1
+    while count_res > 0:
+        count_res = update_perf(opt, datab, interval)
     
+    count_res = 1
+    while count_res > 0:
+        count_res = update_err(opt, datab, interval)
     
-    
-    query = """SELECT   n_name, p_ext, EXTRACT(EPOCH FROM pdat_time),
-                        pk_name, pdat_val
-                FROM perfdata   NATURAL JOIN perfkeys
-                        NATURAL JOIN ports
-                        NATURAL JOIN nodes;"""
-    res = datab.sel(query)
-    data = {}
-    for row in res:
-        (n_name, p_ext, pdat_time, pk_name, pdat_val) = row
-        if n_name not in data.keys():
-            data[n_name] = {}
-        if p_ext not in data[n_name].keys():
-            data[n_name][p_ext] = {}
-        data[n_name][p_ext][pk_name] = {'ts':pdat_time, 'val':pdat_val}
-    
-    for node, ports in data.items():
-        for p_ext, perfkeys in ports.items():
-            rrd_file = "%s_%s" % (node,p_ext)
-            my_rrd = rrd.RRD(rrd_file)
-            if not os.path.exists(rrd_file):
-                my_rrd.create_rrd(interval)
-            ins =  {
-                'xmit_data':0,
-                'rcv_data':0,
-                'symbol_err_cnt':0,
-                'xmit_discards':0,
-                'vl15_dropped':0,
-                'link_downed':0
-                }
-            for key, val in perfkeys.items():
-                ins[key] = val['val']
-
-            my_rrd.update_perf(ins)
-            my_rrd.update_err(ins)
-     
+            
     
 if __name__ == "__main__":
     main()

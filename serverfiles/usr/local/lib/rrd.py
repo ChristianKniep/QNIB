@@ -38,7 +38,11 @@ class RRD(object):
         self.create_perf(interval)
         self.create_err(interval)
 
-    def create_perf(self, interval):  
+    def create_perf(self, interval, start=None):  
+        if os.path.exists(self.rrd_perf):
+            return
+        else:
+            print self.file_perf
         interval = str(interval) 
         interval_mins = float(interval) / 60  
         heartbeat = str(int(interval) * 2)
@@ -48,6 +52,11 @@ class RRD(object):
             ]
                   
         cmd_create = ['rrdtool', 'create', self.rrd_perf, '--step', interval]
+        if start != None:
+            cmd_create.extend([
+                '--start',
+                str(start-int(interval))
+            ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
             'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
@@ -55,11 +64,10 @@ class RRD(object):
             'RRA:AVERAGE:0.5:%s:800' % str(int(120/interval_mins)),
             'RRA:AVERAGE:0.5:%s:800' % str(int(1440/interval_mins)),
             ])
-
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
         
-    def create_err(self, interval):  
+    def create_err(self, interval, start=None):  
         interval = str(interval) 
         interval_mins = float(interval) / 60  
         heartbeat = str(int(interval) * 2)
@@ -71,6 +79,11 @@ class RRD(object):
             ]
                   
         cmd_create = ['rrdtool', 'create', self.rrd_err, '--step', interval]
+        if start != None:
+            cmd_create.extend([
+                '--start',
+                str(start-int(interval))
+            ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
             'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
@@ -82,17 +95,26 @@ class RRD(object):
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
 
-    def update_perf(self, data):
+    def update_perf(self, ins):
         cmd_update = ['rrdtool', 'update', self.rrd_perf]
-        val =  "N:%(xmit_data)s:%(rcv_data)s" % data
-        cmd_update.append(val)
+        stamps = ins.keys()
+        stamps.sort()
+        for stamp in stamps:
+            val =  str(stamp)
+            val += ":%(xmit_data)s:%(rcv_data)s" % ins[stamp]
+            cmd_update.append(val)
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
-    def update_err(self, data):
+    
+    def update_err(self, ins):
         cmd_update = ['rrdtool', 'update', self.rrd_err]
-        val =  "N:%(symbol_err_cnt)s:%(xmit_discards)s" % data
-        val += ':%(vl15_dropped)s:%(link_downed)s' % data
-        cmd_update.append(val)
+        stamps = ins.keys()
+        stamps.sort()
+        for stamp in stamps:
+            val =  str(stamp)
+            val +=  ":%(symbol_err_cnt)s:%(xmit_discards)s" % ins[stamp]
+            val += ':%(vl15_dropped)s:%(link_downed)s' % ins[stamp]
+            cmd_update.append(val)
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
     
@@ -103,7 +125,7 @@ class RRD(object):
     def graph_perf(self, mins):       
         start_time = 'now-%s' % (mins * 60)  
         end_time = 'now'
-        ds_name = 'test'
+        ds_name = 'Performance Chart'
         width = '400'
         height = '150'
         cmd_graph = ['rrdtool', 'graph', self.png_perf]

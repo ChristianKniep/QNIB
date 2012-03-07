@@ -11,7 +11,6 @@ import rrd
 import dbCon
 import libTopology
 
-
 class MYparameter(libTopology.Parameter):
     def default(self):
         # Default-Options

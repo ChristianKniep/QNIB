@@ -43,6 +43,13 @@ class dbCon(object):
         if self.db: self.db.deb("Commit")
         self.__con.commit()
         self.commits += 1
+    def exe(self, query, debug=3):
+        self.querys += 1
+        self.commit()
+        if self.db:
+            self.db.deb(query, debug)
+        self.__cur.execute(query)
+        self.commit()
     def ins(self,query,debug=3):
         self.querys += 1
         self.commit()
