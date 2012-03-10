@@ -108,7 +108,9 @@ CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
         END IF;
     END;
     
-$$ LANGUAGE 'plpgsql';CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
+$$ LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION osmInAllPerfCnt(text,int,int,
                     bigint, bigint, bigint, bigint)
                 RETURNS VOID AS $$
 /* IN:  NodeGUID,PortNr,time_diff since last insert,
@@ -230,7 +232,7 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
         ports       intval%ROWTYPE;
     BEGIN
         -- Get key informations to insert the key/value pair 
-        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2;
+        SELECT p_id INTO ports FROM getport WHERE n_guid=$1 AND p_int=$2; 
         
         IF ports.val IS NOT NULL THEN
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;

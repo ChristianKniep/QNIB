@@ -14,13 +14,25 @@
 import os
 import time
 import subprocess
+import re
 
+def exp2int(zahl):
+    if zahl in ('0','-nan'):
+        return 0
+    else:
+        reg = '(\d+),(\d+)e\+(\d+)'
+        mat = re.search(reg,zahl)
+        if mat:
+            (pre, post, exp) = mat.groups()
+            return int((float(pre)+float(".%s" % post))*(10**int(exp)))
 
 class RRD(object):
-    def __init__(self, file_name, vertical_label='test'):
+    def __init__(self, node, p_ext, vertical_label='test'):
+        self.node_name = node
+        file_name = "%s_%s" % (node, p_ext)
         self.file_perf = "%s_perf" % file_name
         self.rrd_perf = "/srv/rrd/qnib/%s.rrd" % self.file_perf
-        self.png_perf = "/srv/www/qnib/%s.png" % self.file_perf
+        self.html_file = "/srv/www/qnib/%s.html" % node
         self.file_err = "%s_err" % file_name
         self.rrd_err = "/srv/rrd/qnib/%s.rrd" % self.file_err
         self.png_err = "/srv/www/qnib/%s.png" % self.file_err
@@ -44,7 +56,7 @@ class RRD(object):
         else:
             print self.file_perf
         interval = str(interval) 
-        interval_mins = float(interval) / 60  
+        interval_mins = float(interval) / 60
         heartbeat = str(int(interval) * 2)
         ds_arr = [
             'DS:xmit_data:GAUGE:%s:U:U' % heartbeat,
@@ -59,10 +71,7 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(30/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(120/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(1440/interval_mins)),
+            'RRA:AVERAGE:0.5:30:3600'
             ])
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
@@ -86,10 +95,7 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(30/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(120/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(1440/interval_mins)),
+            'RRA:AVERAGE:0.5:30:3600'
             ])
 
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
@@ -118,63 +124,135 @@ class RRD(object):
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
     
-    def graph(self, mins):
-        self.graph_perf(mins)
-        self.graph_err(mins)
+    def html5(self, mins):
+        self.html_code = """<!DOCTYPE HTML>
+<html>
+    <head>
+      <link rel="stylesheet" href="css/combined.css"/>
+      <script src="js/jquery.min.js"></script>
+      <script src="js/visualize.jQuery.js"></script>
+      <script>
+        $(function(){
+          $('table.line').visualize({type: 'line', parseDirection:'y'});
+         });
+      </script>
+    </head>
+    <body>
+"""
+        self.html5_perf(mins)
+        self.html5_err(mins)
+
+        self.html_code += """
+    </body>
+</html>
+"""
+        file_d = open(self.html_file, "w")
+        file_d.write(self.html_code)
+        file_d.close()
         
-    def graph_perf(self, mins):       
+    def html5_perf(self, mins):
         start_time = 'now-%s' % (mins * 60)  
-        end_time = 'now'
-        ds_name = 'Performance Chart'
-        width = '400'
-        height = '150'
-        cmd_graph = ['rrdtool', 'graph', self.png_perf]
-        ds_names = ['xmit_data', 'rcv_data']
-        for ds_name in ds_names:
-            cmd_graph.append('DEF:%s=%s:%s:AVERAGE' % (ds_name, self.rrd_perf, ds_name))
-            cmd_graph.append('LINE:%s#%s:%s' % (ds_name, self.rrd_color[ds_name], ds_name))
-            cmd_graph.append('VDEF:%slast=%s,LAST' % (ds_name, ds_name))
-            cmd_graph.append('VDEF:%savg=%s,AVERAGE' % (ds_name, ds_name))
-            #cmd_graph.append('GPRINT:%slast:last=%%6.2lf\n' % ds_name)
-        cmd_graph.extend([
-                '--title="%s"' % self.rrd_perf,
-                '--vertical-label="%s"' % self.vertical_label,
-                '--start=%s' % start_time,
-                '--end=%s' % end_time,
-                '--width=%s' % width,
-                '--height=%s' % height,
-                '--lower-limit="0"'
-                ])
-        process = subprocess.Popen(cmd_graph, shell=False, stdout=subprocess.PIPE)
-        process.communicate()
-    
-    def graph_err(self, mins):       
+        start_time = '1331398900-%s' % (mins * 60)  
+        end_time = '1331398900'
+        #end_time = 'now'
+        
+        cmd_html = ['rrdtool', 'fetch', self.rrd_perf,
+                    '-s',start_time,'-e',end_time,'AVERAGE']
+        process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+
+        (out, errc) = process.communicate()
+        self.html_code2 = """
+        <table class="line" style="display:none;">
+          <caption>Performance %s</caption>
+          <thead>
+            <tr>
+              <td></td>
+              <th>Symbol ErrCnt</th>
+              <th>Xmit Discards</th>
+              <th>VL15 dropped</th>
+              <th>Link downed</th>
+            </tr>
+          </thead>
+          <tbody>""" % self.node_name
+        self.html_code += """
+        <table class="line" style="display:none;">
+            <caption>Performance %s</caption>
+            <thead>
+                <tr>
+                  <td></td>
+                  <th>Xmit Data</th>
+                  <th>Rcv Data</th>
+                </tr>
+            </thead>
+            <tbody>""" % self.node_name
+              
+            
+        for line in out.split('\n'):
+            if not re.match('\d+',line): continue
+            (mat0, mat1, mat2) = line.split()
+            stamp = re.search('(\d+)',mat0).group(1)
+            val1 = exp2int(mat1)
+            val2 = exp2int(mat2)
+            self.html_code += """
+            <tr>
+                <th>%s</th>
+                <td>%s</td>
+                <td>%s</td>
+            </tr>
+            """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
+                   val1, val2)
+        self.html_code += """
+            </tbody>
+        </table>
+        """
+    def html5_err(self, mins):
         start_time = 'now-%s' % (mins * 60)  
-        end_time = 'now'
-        ds_name = 'test'
-        width = '400'
-        height = '150'
-        cmd_graph = ['rrdtool', 'graph', self.png_err]
-        ds_names = ['symbol_err_cnt', 'xmit_discards', \
-                    'vl15_dropped', 'link_downed']
-        for ds_name in ds_names:
-            cmd_graph.append('DEF:%s=%s:%s:AVERAGE' % (ds_name, self.rrd_err, ds_name))
-            cmd_graph.append('LINE:%s#%s:%s' % (ds_name, self.rrd_color[ds_name], ds_name))
-            cmd_graph.append('VDEF:%slast=%s,LAST' % (ds_name, ds_name))
-            cmd_graph.append('VDEF:%savg=%s,AVERAGE' % (ds_name, ds_name))
-            #cmd_graph.append('GPRINT:%slast:last=%%6.2lf\n' % ds_name)
-        cmd_graph.extend([
-                '--title="%s"' % self.rrd_err,
-                '--vertical-label="%s"' % self.vertical_label,
-                '--start=%s' % start_time,
-                '--end=%s' % end_time,
-                '--width=%s' % width,
-                '--height=%s' % height,
-                '--lower-limit="0"'
-                ])
-        process = subprocess.Popen(cmd_graph, shell=False, stdout=subprocess.PIPE)
-        process.communicate()
+        start_time = '1331398900-%s' % (mins * 60)  
+        end_time = '1331398900'
+        #end_time = 'now'
+        
+        cmd_html = ['rrdtool', 'fetch', self.rrd_err,
+                    '-s',start_time,'-e',end_time,'AVERAGE']
+        process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+
+        (out, errc) = process.communicate()
+        self.html_code += """
+        <table class="line" style="display:none;">
+            <caption>Errorcounter %s</caption>
+            <thead>
+            <tr>
+                <td></td>
+                <th>Symbol ErrCnt</th>
+                <th>Xmit Discards</th>
+                <th>VL15 dropped</th>
+                <th>Link downed</th>
+                </tr>
+            </thead>
+            <tbody>""" % self.node_name
+              
             
-            
+        for line in out.split('\n'):
+            if not re.match('\d+',line): continue
+            (mat0, mat1, mat2, mat3, mat4) = line.split()
+            stamp = re.search('(\d+)',mat0).group(1)
+            val1 = exp2int(mat1)
+            val2 = exp2int(mat2)
+            val3 = exp2int(mat3)
+            val4 = exp2int(mat4)
+            self.html_code += """
+                <tr>
+                    <th>%s</th>
+                    <td>%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                </tr>
+            """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
+                   val1, val2, val3, val4)
+        self.html_code += """
+            </tbody>
+        </table>
+        """
+        
 class RRDException(Exception): pass
 

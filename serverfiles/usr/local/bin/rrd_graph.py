@@ -42,19 +42,9 @@ def main(argv=None):
         data[n_name].append(p_ext)
     
     for node, ports in data.items():
-        html_file = open("/srv/www/qnib/%s.html" % node, "w")
-        html_file.write("<h2>%s</h2>\n" % node)
-        html_file.write("<h3>Performance</h3>\n")
         for p_ext in ports:
-            html_file.write("<img src=\"%s_%s_perf.png\" />" % (node, p_ext))
-        html_file.write("<h3>Error</h3>\n")
-        for p_ext in ports:
-            html_file.write("<img src=\"%s_%s_err.png\" />" % (node, p_ext))
-            
-        for p_ext in ports:
-            rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
-            my_rrd.graph(60)
+            my_rrd = rrd.RRD(node, p_ext)
+            my_rrd.html5(45)
         
         
      

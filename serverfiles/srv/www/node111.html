@@ -1,0 +1,65 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <link rel="stylesheet" href="css/combined.css"/>
+  <script src="js/jquery.min.js"></script>
+  <script src="js/visualize.jQuery.js"></script>
+  <script>
+    $(function(){
+      $('table.line').visualize({type: 'line', parseDirection:'y'});
+     });
+  </script>
+</head>
+<body>
+<table class="line" style="display:none;">
+  <caption>Performance node111</caption>
+  <thead>
+    <tr>
+      <td></td>
+      <th>Xmit Data:#1</th>
+      <th>Rcv Data:#1</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>10:05</th>
+      <td>238</td>
+      <td>274</td>
+    </tr><tr>
+      <th>10:10</th>
+      <td>251</td>
+      <td>278</td>
+    </tr><tr>
+      <th>10:15</th>
+      <td>256</td>
+      <td>244</td>
+    </tr><tr>
+      <th>10:20</th>
+      <td>282</td>
+      <td>284</td>
+    </tr><tr>
+      <th>10:25</th>
+      <td>225</td>
+      <td>271</td>
+    </tr><tr>
+      <th>10:30</th>
+      <td>278</td>
+      <td>250</td>
+    </tr><tr>
+      <th>10:35</th>
+      <td>221</td>
+      <td>223</td>
+    </tr><tr>
+      <th>10:40</th>
+      <td>295</td>
+      <td>277</td>
+    </tr>
+    <tr>
+      <th>10:45</th>
+      <td>240</td>
+      <td>246</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

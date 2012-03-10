@@ -59,7 +59,7 @@ def update_err(opt, datab, interval):
     for node, ports in data.items():
         for p_ext, time_stamps in ports.items():
             rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
+            my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
             my_rrd.create_err(interval, stamps[0])
@@ -74,8 +74,8 @@ def update_perf(opt, datab, interval):
                 FROM perfdata   NATURAL JOIN perfkeys
                         NATURAL JOIN ports
                         NATURAL JOIN nodes
-                WHERE pk_name in ('xmit_data', 'rcv_data')
-                ORDER BY pd_id ASC LIMIT 500"""
+                WHERE   pk_name in ('xmit_data', 'rcv_data')
+                ORDER BY pd_id ASC LIMIT 5000"""
     res = datab.sel(query)
     data = {}
     pd_ids = []
@@ -98,8 +98,7 @@ def update_perf(opt, datab, interval):
     
     for node, ports in data.items():
         for p_ext, time_stamps in ports.items():
-            rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
+            my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
             my_rrd.create_perf(interval, stamps[0])
@@ -117,7 +116,6 @@ def main(argv=None):
     count_res = 1
     while count_res > 0:
         count_res = update_perf(opt, datab, interval)
-    
     count_res = 1
     while count_res > 0:
         count_res = update_err(opt, datab, interval)
