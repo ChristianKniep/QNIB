@@ -91,7 +91,7 @@ def update_perf(opt, datab, interval):
                         NATURAL JOIN ports
                         NATURAL JOIN nodes
                 WHERE   pk_name in ('xmit_data', 'rcv_data')
-                ORDER BY pd_id ASC LIMIT 5000"""
+                ORDER BY pd_id ASC LIMIT 1000"""
     res = datab.sel(query)
     data = {}
     pd_ids = []

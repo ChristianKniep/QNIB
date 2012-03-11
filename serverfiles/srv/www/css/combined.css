@@ -4,10 +4,20 @@
 .visualize ul,.visualize li { margin: 0; padding: 0;}
 
 /*table title, key elements*/
-.visualize .visualize-info { padding: 3px 5px; background: #fafafa; border: 1px solid #888; position: absolute; top: -20px; right: 10px; opacity: .8; }
-.visualize .visualize-title { display: block; color: #333; margin-bottom: 3px;  font-size: 1.1em; }
+.visualize .visualize-info { padding: 3px 5px;
+                            background: #fafafa;
+                            border: 1px solid #888;
+                            position: absolute;
+                            top: -20px;
+                            right: 10px;
+                            opacity: .8; }
+.visualize .visualize-title { display: block;
+                                color: #333;
+                                margin-bottom: 3px;
+                                font-size: 1.1em; }
 .visualize ul.visualize-key { list-style: none;  }
 .visualize ul.visualize-key li { list-style: none; float: left; margin-right: 1px; padding-left: 1px; position: relative;}
+/* */
 .visualize ul.visualize-key .visualize-key-color { width: 6px; height: 6px; left: 0; position: absolute; top: 50%; margin-top: -3px;  }
 .visualize ul.visualize-key .visualize-key-label { color: #000; }
 
@@ -41,11 +51,11 @@ background: #222 url(../images/chartbg.png) top repeat-x; border: 1px solid #000
 .visualize-labels-x, .visualize-labels-y { top: 25px; left: 40px; z-index: 100; }
 .visualize-pie .visualize-labels { position: absolute; top: 20px; left: 30px; }
 .visualize-labels-x li span.label, .visualize-labels-y li span.label { color: #fff; font-size: 0.65em; font-weight:bold; padding-right: 5px; }
-.visualize-labels-y li span.line { border-style: dotted;  opacity: .6; }
-.visualize .visualize-info { border: 0; position: static;  opacity: 1; background: none; }
+.visualize-labels-y li span.line { border-style: dotted;  opacity: .6; } /* dotted line within chart */
+.visualize .visualize-info { border: 0px; position: static; opacity: 1; }
 .visualize .visualize-title { position: absolute; top: 2px; color: #fff; margin-bottom: 0; left: 40px; font-size: 1.5em; font-weight: bold; }
 .visualize ul.visualize-key { position: absolute; bottom: 5px; background: #444; z-index: 10; padding: 3px 0; color: #aaa; width: 100%; left: 0;  }
-.visualize ul.visualize-key li { font-size: 1.2em;  margin-left: 10px; padding-left: 18px; }
+.visualize ul.visualize-key li { font-size: .8em;  margin-left: 10px; padding-left: 18px; }
 .visualize ul.visualize-key .visualize-key-color { width: 10px; height: 10px;  margin-top: -4px; }
 .visualize ul.visualize-key .visualize-key-label { color: #fff;  }
 

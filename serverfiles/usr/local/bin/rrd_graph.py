@@ -58,9 +58,8 @@ def main(argv=None):
         data[n_name].append(p_ext)
     
     for node, ports in data.items():
-        for p_ext in ports:
-            my_rrd = rrd.RRD(node, p_ext)
-            my_rrd.html5(45)
+        my_rrd = rrd.RRD(node)
+        my_rrd.html5(15,'1331408194')
         
         
      

@@ -24,36 +24,23 @@ import os
 import time
 import subprocess
 import re
+import sys
 
 def exp2int(zahl):
     if zahl in ('0','-nan'):
-        return 0
+        return str(0)
     else:
         reg = '(\d+),(\d+)e\+(\d+)'
         mat = re.search(reg,zahl)
         if mat:
             (pre, post, exp) = mat.groups()
-            return int((float(pre)+float(".%s" % post))*(10**int(exp)))
+            return str(int((float(pre)+float(".%s" % post))*(10**int(exp))))
 
 class RRD(object):
-    def __init__(self, node, p_ext, vertical_label='test'):
+    def __init__(self, node, vertical_label='test'):
         self.node_name = node
-        file_name = "%s_%s" % (node, p_ext)
-        self.file_perf = "%s_perf" % file_name
-        self.rrd_perf = "/srv/rrd/qnib/%s.rrd" % self.file_perf
         self.html_file = "/srv/www/qnib/%s.html" % node
-        self.file_err = "%s_err" % file_name
-        self.rrd_err = "/srv/rrd/qnib/%s.rrd" % self.file_err
-        self.png_err = "/srv/www/qnib/%s.png" % self.file_err
-        self.vertical_label = vertical_label
-        self.rrd_color =  {
-            'xmit_data':"FF0000",
-            'rcv_data':"00FF00",
-            'symbol_err_cnt':'FF0000',
-            'xmit_discards':'00FF00',
-            'vl15_dropped':'0000FF',
-            'link_downed':'FF00FF'
-            }
+        self.rrd_base =  "/srv/rrd/qnib/"
 
     def create_rrd(self, interval):
         self.create_perf(interval)
@@ -133,7 +120,7 @@ class RRD(object):
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
     
-    def html5(self, mins):
+    def html5(self, mins,s_time='now'):
         self.html_code = """<!DOCTYPE HTML>
 <html>
     <head>
@@ -148,8 +135,8 @@ class RRD(object):
     </head>
     <body>
 """
-        self.html5_perf(mins)
-        self.html5_err(mins)
+        self.html5_tab(mins, s_time, 'perf')
+        self.html5_tab(mins, s_time, 'err')
 
         self.html_code += """
     </body>
@@ -159,105 +146,132 @@ class RRD(object):
         file_d.write(self.html_code)
         file_d.close()
         
-    def html5_perf(self, mins):
-        start_time = 'now-%s' % (mins * 60)  
-        start_time = '1331398900-%s' % (mins * 60)  
-        end_time = '1331398900'
-        #end_time = 'now'
+    def html5_tab(self, mins,s_time, typ):
+        start_time = '%s-%s' % (s_time, mins * 60)  
+        end_time = s_time
         
-        cmd_html = ['rrdtool', 'fetch', self.rrd_perf,
-                    '-s',start_time,'-e',end_time,'AVERAGE']
-        process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+        reg = "%s_(\d+)_%s\.rrd" % (self.node_name,typ)
+        td_vals = {}
+        td_vals_by_stamp = {}
+        plain_keys = set([])
+        plain_ports = []
+        files = os.listdir(self.rrd_base)
+        for file_name in [x for x in files if re.match(reg, x)]:
+            mat = re.match(reg, file_name)
+            p_ext = mat.group(1)
+            plain_ports.append(p_ext)
+            cmd_html = ['rrdtool', 'fetch',
+                        "%s%s" % (self.rrd_base, file_name),
+                        '-s',start_time,'-e',end_time,'AVERAGE']
+            process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+    
+            (out, errc) = process.communicate()
+            reg_head = "[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)"
+            for line in out.split('\n'):
+                if re.match('[ \t]+[a-z_0-9]', line):
+                    td_keys = []
+                    td_heads = line.split()
+                    for td_head in td_heads:
+                        plain_keys.add(td_head)
+                        key = "%s[%s]" % (td_head, p_ext)
+                        td_keys.append(key)
+                        if key not in td_vals.keys():
+                            td_vals[key] = {}
+                elif re.match('\d+', line):
+                    c = 0
+                    td_bodys = line.split()
+                    stamp = td_bodys[0].replace(":","")
+                    if stamp not in td_vals_by_stamp.keys():
+                        td_vals_by_stamp[stamp] = {}
+                    for td_body in td_bodys[1:]:
+                        val = exp2int(td_body)
+                        td_vals[td_keys[c]][stamp] = val
+                        td_vals_by_stamp[stamp][td_keys[c]] = val
+                        c += 1
 
-        (out, errc) = process.communicate()
-        self.html_code2 = """
-        <table class="line" style="display:none;">
-          <caption>Performance %s</caption>
-          <thead>
-            <tr>
-              <td></td>
-              <th>Symbol ErrCnt</th>
-              <th>Xmit Discards</th>
-              <th>VL15 dropped</th>
-              <th>Link downed</th>
-            </tr>
-          </thead>
-          <tbody>""" % self.node_name
+        plain_ports.reverse()
+        val_keys = []
+        for plain_port in plain_ports:
+            for plain_key in plain_keys:
+                val_keys.append("%s[%s]" % (plain_key, plain_port))
+        ## Table start
         self.html_code += """
         <table class="line" style="display:none;">
             <caption>Performance %s</caption>
             <thead>
                 <tr>
                   <td></td>
-                  <th>Xmit Data</th>
-                  <th>Rcv Data</th>
+                  <th>%s</th>
                 </tr>
             </thead>
-            <tbody>""" % self.node_name
-              
-            
-        for line in out.split('\n'):
-            if not re.match('\d+',line): continue
-            (mat0, mat1, mat2) = line.split()
-            stamp = re.search('(\d+)',mat0).group(1)
-            val1 = exp2int(mat1)
-            val2 = exp2int(mat2)
+            <tbody>""" % (self.node_name,
+                "</th>\n                   <th>".join(val_keys))
+        for stamp, vals in td_vals_by_stamp.items():
             self.html_code += """
             <tr>
                 <th>%s</th>
-                <td>%s</td>
-                <td>%s</td>
+                """ % time.strftime("%H:%M", time.localtime(int(stamp)))
+            self.html_code += """<td>%s</td>
             </tr>
-            """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
-                   val1, val2)
+            """ % "</td>\n                <td>".join(vals.values())
+
         self.html_code += """
             </tbody>
         </table>
         """
-    def html5_err(self, mins):
-        start_time = 'now-%s' % (mins * 60)  
-        start_time = '1331398900-%s' % (mins * 60)  
-        end_time = '1331398900'
-        #end_time = 'now'
+    def html5_err(self, mins,s_time):
+        start_time = '%s-%s' % (s_time, mins * 60)  
+        end_time = s_time
         
-        cmd_html = ['rrdtool', 'fetch', self.rrd_err,
-                    '-s',start_time,'-e',end_time,'AVERAGE']
-        process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
-
-        (out, errc) = process.communicate()
-        self.html_code += """
-        <table class="line" style="display:none;">
-            <caption>Errorcounter %s</caption>
-            <thead>
-            <tr>
-                <td></td>
-                <th>Symbol ErrCnt</th>
-                <th>Xmit Discards</th>
-                <th>VL15 dropped</th>
-                <th>Link downed</th>
-                </tr>
-            </thead>
-            <tbody>""" % self.node_name
-              
-            
-        for line in out.split('\n'):
-            if not re.match('\d+',line): continue
-            (mat0, mat1, mat2, mat3, mat4) = line.split()
-            stamp = re.search('(\d+)',mat0).group(1)
-            val1 = exp2int(mat1)
-            val2 = exp2int(mat2)
-            val3 = exp2int(mat3)
-            val4 = exp2int(mat4)
-            self.html_code += """
-                <tr>
-                    <th>%s</th>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                </tr>
-            """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
-                   val1, val2, val3, val4)
+        reg = "%s_(\d+)_err\.rrd" % self.node_name
+        for root, dirs, files in os.walk(self.rrd_base):
+            for file_name in files:
+                mat = re.match(reg, file_name)
+                if not mat:
+                    continue
+                p_ext = mat.group(1)
+                cmd_html = ['rrdtool', 'fetch',
+                            "%s%s" % (self.rrd_base, file_name),
+                            '-s',start_time,'-e',end_time,'AVERAGE']
+                process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+        
+                (out, errc) = process.communicate()
+                self.html_code += """
+                <table class="line" style="display:none;">
+                    <caption>Errorcounter %s external port %s</caption>
+                    <thead>
+                    <tr>
+                        <td></td>
+                        <th>Symbol ErrCnt</th>
+                        <th>Xmit Discards</th>
+                        <th>VL15 dropped</th>
+                        <th>Link downed</th>
+                        </tr>
+                    </thead>
+                    <tbody>""" % (self.node_name, p_ext)
+                    
+                for line in out.split('\n'):
+                    if not re.match('\d+', line): continue
+                    try:
+                        (mat0, mat1, mat2, mat3, mat4) = line.split()
+                    except ValueError,e:
+                        print line
+                        raise ValueError(e)
+                    stamp = re.search('(\d+)', mat0).group(1)
+                    val1 = exp2int(mat1)
+                    val2 = exp2int(mat2)
+                    val3 = exp2int(mat3)
+                    val4 = exp2int(mat4)
+                    self.html_code += """
+                        <tr>
+                            <th>%s</th>
+                            <td>%s</td>
+                            <td>%s</td>
+                            <td>%s</td>
+                            <td>%s</td>
+                        </tr>
+                    """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
+                           val1, val2, val3, val4)
         self.html_code += """
             </tbody>
         </table>
