@@ -12,7 +12,7 @@
 .visualize ul.visualize-key .visualize-key-label { color: #000; }
 
 /*line,bar, area labels*/
-.visualize-labels-x,.visualize-labels-y { position: absolute; left: 0; top: 0; list-style: none; }
+.visualize-labels-x,.visualize-labels-y { position: absolute; left: 0; top: 5; list-style: none; }
 .visualize-labels-x li, .visualize-labels-y li { position: absolute; bottom: 0; }
 .visualize-labels-x li span.label, .visualize-labels-y li span.label { position: absolute; color: #555;  }
 .visualize-labels-x li span.line, .visualize-labels-y li span.line {  position: absolute; border: 0 solid #ccc; }
@@ -40,7 +40,7 @@ background: #222 url(../images/chartbg.png) top repeat-x; border: 1px solid #000
 .visualize canvas { border: 1px solid #888; margin: -1px; background: #222; }
 .visualize-labels-x, .visualize-labels-y { top: 25px; left: 40px; z-index: 100; }
 .visualize-pie .visualize-labels { position: absolute; top: 20px; left: 30px; }
-.visualize-labels-x li span.label, .visualize-labels-y li span.label { color: #fff; font-size: 1em; font-weight:bold; padding-right: 5px; }
+.visualize-labels-x li span.label, .visualize-labels-y li span.label { color: #fff; font-size: 0.65em; font-weight:bold; padding-right: 5px; }
 .visualize-labels-y li span.line { border-style: dotted;  opacity: .6; }
 .visualize .visualize-info { border: 0; position: static;  opacity: 1; background: none; }
 .visualize .visualize-title { position: absolute; top: 2px; color: #fff; margin-bottom: 0; left: 40px; font-size: 1.5em; font-weight: bold; }
@@ -54,10 +54,12 @@ background: #222 url(../images/chartbg.png) top repeat-x; border: 1px solid #000
 body    { font-size: 62.5%; font-family: Verdana, sans-serif; }
 table   {   width: 400px;
             height: 150px;
-            border-collapse: collapse; margin-left: 30px; font-size: 1em;}
-td, th  { text-align: center; border: 1px solid #ddd; padding:2px 5px; font-size: 1.2em; padding: 2px; width: 13%; }
+            border-collapse: collapse;
+            margin-left: 30px;
+            font-size: 1em;}
+td, th  { text-align: center; border: 1px solid #ddd; padding:2px 10px; font-size: 1.2em; padding: 2px; width: 13%; }
 th      { background-color:#f4f4f4; }
 caption {margin: 1.5em 0 .5em; font-size: 1.5em; font-weight: bold; }
 
 /* Common charts styles */
-.visualize { margin: 0px 0 0 0px; }
+.visualize { margin: 5px 0 0 5px; }
