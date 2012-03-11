@@ -1,14 +1,23 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
-#  rrd.py
-#  Simple RRDTool wrapper
-#  Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
 #
-#  Download the Windows version of RRDTool from:
-#    http://www.gknw.net/mirror/rrdtool/
-# 
-#  You may need these fonts if RRDTool throws an error when you graph:
-#    http://dejavu.sourceforge.net/wiki/index.php/Main_Page
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
+# Inspired by the Work of Corey due to his rrd.py-Examplelibrary:
+# http://code.google.com/p/rrdpy/
+## Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
 
 
 import os
