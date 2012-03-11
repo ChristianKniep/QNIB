@@ -195,16 +195,22 @@ class RRD(object):
             for plain_key in plain_keys:
                 val_keys.append("%s[%s]" % (plain_key, plain_port))
         ## Table start
+        if typ=='perf':
+            tab_typ = "Performance"
+        elif typ=='err':
+            tab_typ = "Errorcounter"
+        else:
+            tab_typ = "Unkown typ"
         self.html_code += """
         <table class="line" style="display:none;">
-            <caption>Performance %s</caption>
+            <caption>%s %s</caption>
             <thead>
                 <tr>
                   <td></td>
                   <th>%s</th>
                 </tr>
             </thead>
-            <tbody>""" % (self.node_name,
+            <tbody>""" % (tab_typ, self.node_name,
                 "</th>\n                   <th>".join(val_keys))
         for stamp, vals in td_vals_by_stamp.items():
             self.html_code += """

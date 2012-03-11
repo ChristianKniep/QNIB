@@ -41,11 +41,9 @@ class MYparameter(libTopology.Parameter):
 
 def main(argv=None):
     opt = MYparameter(argv)
-    
+
     datab = dbCon.dbCon(opt)
-    
-    
-    
+
     query = """SELECT DISTINCT n_name, p_ext
                 FROM ports NATURAL JOIN nodes
                 ORDER BY n_name,p_ext;"""
