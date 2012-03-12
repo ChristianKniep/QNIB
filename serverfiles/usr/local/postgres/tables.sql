@@ -177,6 +177,15 @@ CREATE TABLE perfdata (
         PRIMARY KEY (p_id,pk_id,pdat_time)
 );
 
+CREATE TABLE perfcache (
+    pc_id SERIAL,
+    p_id integer references ports(p_id) ON DELETE CASCADE,
+    pk_id integer references perfkeys(pk_id),
+    pc_val bigint,
+    CONSTRAINT perfcache_pk
+        PRIMARY KEY (p_id,pk_id)
+);
+
 -- opensm
 CREATE TABLE traps (
     trap_id SERIAL,

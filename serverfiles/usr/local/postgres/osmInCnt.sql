@@ -175,6 +175,7 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint)
     DECLARE
         pk          intval%ROWTYPE;
         pd          intval%ROWTYPE;
+        pc          intval%ROWTYPE;
         ports       intval%ROWTYPE;
     BEGIN
         -- Get key informations to insert the key/value pair 
@@ -184,7 +185,12 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint)
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
-            
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$5/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$5/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
         END IF;
     END;
 $$ LANGUAGE 'plpgsql';
@@ -199,6 +205,7 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
     DECLARE
         pk          intval%ROWTYPE;
         pd          intval%ROWTYPE;
+        pc          intval%ROWTYPE;
         ports       intval%ROWTYPE;
     BEGIN
         -- Get key informations to insert the key/value pair 
@@ -208,10 +215,22 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$5/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$5/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$7/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$7/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
        
         END IF;
     END;
@@ -229,6 +248,7 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
     DECLARE
         pk          intval%ROWTYPE;
         pd          intval%ROWTYPE;
+        pc          intval%ROWTYPE;
         ports       intval%ROWTYPE;
     BEGIN
         -- Get key informations to insert the key/value pair 
@@ -238,14 +258,32 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$5/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$5/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$7/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$7/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$8 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$9/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$9/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$9/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
        
         END IF;
     END;
@@ -263,6 +301,7 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
     DECLARE
         pk          intval%ROWTYPE;
         pd          intval%ROWTYPE;
+        pc          intval%ROWTYPE;
         ports       intval%ROWTYPE;
     BEGIN
         -- Get key informations to insert the key/value pair 
@@ -272,18 +311,42 @@ CREATE OR REPLACE FUNCTION osmInsertTuple(text,int,int, text, bigint,
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$4 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$5/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$5/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$5/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$6 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$7/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$7/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$7/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$8 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$9/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$9/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$9/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
             
             SELECT pk_id INTO pk FROM perfkeys WHERE pk_name=$10 ORDER BY pk_id LIMIT 1;
             SELECT pd_id INTO pd FROM perfdata WHERE p_id=ports.val AND pk_id=pk.val;
             INSERT INTO perfdata (p_id,pk_id,pdat_val) VALUES (ports.val,pk.val,$11/$3);
+            SELECT pc_id INTO pc FROM perfcache WHERE p_id=ports.val AND pk_id=pk.val;
+            IF NOT FOUND THEN
+                INSERT INTO perfcache (p_id,pk_id,pc_val) VALUES (ports.val,pk.val,$11/$3);
+            ELSE
+                UPDATE perfcache SET pc_val=$11/$3 WHERE p_id=ports.val AND pk_id=pk.val;
+            END IF;
        
         END IF;
     END;

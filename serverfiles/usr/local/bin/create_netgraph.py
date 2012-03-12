@@ -61,21 +61,21 @@ class config(object):
         else:           return self.data[section][option]
 
     
-def create(options,db, cfg, log):
+def create(options,rDB, cfg, log):
     
     if False:
         try: os.remove("/tmp/topology.db")
         except: pass
-        cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
+        cDB = libTopology.cacheDB(options, cfg, rDB, log,"/tmp/topology.db")
     else:
-        cDB = libTopology.cacheDB(options, cfg, db, log)
+        cDB = libTopology.cacheDB(options, cfg, rDB, log)
     
     # init with true clones topology also
     cDB.init(True)
     ## Los gehts
-    topo = libTopology.myTopo(cDB,options,cfg,log)
-    # Create Topology
-    topo.create("plain")
+    topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
+    # Create Topology 
+    topo.create(options.graph)
     topo.svg()
     
     # No Backup needed, we just use the DB

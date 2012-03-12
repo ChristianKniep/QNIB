@@ -6,3 +6,6 @@ CREATE TYPE type1int   	        as (val1 integer);
 
 /* linkFunctions.sql */
 CREATE TYPE type1int1bool       as (val1 integer,val2 boolean);
+
+/* locality */
+CREATE TYPE type6bigint         as (val1 bigint,val2 bigint,val3 bigint,val4 bigint,val5 bigint,val6 bigint);

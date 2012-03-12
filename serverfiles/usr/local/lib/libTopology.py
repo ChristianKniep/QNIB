@@ -79,7 +79,7 @@ class logC(object):
             
 class parseObj(object):
     def __init__(self,db,opt,cfg,allGuids):
-        self.db         = db
+        self.rDB         = db
         self.opt        = opt
         self.cfg        = cfg
         self.allGuids   = allGuids
@@ -120,7 +120,7 @@ class parseObj(object):
                     if self.hostPat[r].has_key('type'):
                         self.type = self.hostPat[r]['type']
                         if type(self) is parseNode:
-                            self.nt_id = self.db.getIns_ID('nodetypes',"nt_name='%s'" % self.type,['nt_name'], [self.type],self.opt.debug)
+                            self.nt_id = self.rDB.getIns_ID('nodetypes',"nt_name='%s'" % self.type,['nt_name'], [self.type],self.opt.debug)
                     if self.hostPat[r].has_key('name'):
                         self.name = self.hostPat[r]['name']
                     if self.hostPat[r].has_key('short'):
@@ -159,16 +159,16 @@ class parseSystem(parseObj):
         self.insDB()
     def insDB(self):
         if self.name:
-            self.s_id = self.db.getIns_ID('systems',"s_guid='%s' AND s_name='%s'" % (self.guid,self.name),['s_guid','s_name'], [self.guid,self.name],self.opt.debug)
+            self.s_id = self.rDB.getIns_ID('systems',"s_guid='%s' AND s_name='%s'" % (self.guid,self.name),['s_guid','s_name'], [self.guid,self.name],self.opt.debug)
         else:
-            self.s_id = self.db.getIns_ID('systems',"s_guid='%s'" % self.guid,['s_guid',], [self.guid,],self.opt.debug)
+            self.s_id = self.rDB.getIns_ID('systems',"s_guid='%s'" % self.guid,['s_guid',], [self.guid,],self.opt.debug)
     def setChassisId(self,c_id):
         self.c_id = c_id
         query = "UPDATE systems SET c_id='%s' WHERE s_id='%s'" % (self.c_id,self.s_id)
-        self.db.exe(query)
+        self.rDB.exe(query)
     def setChassisNr(self,c_nr):
         query = "SELECT c_id FROM chassis WHERE c_nr='%s'" % c_nr
-        res = self.db.selOne(query)
+        res = self.rDB.selOne(query)
         c_id = res[0]
         self.setChassisId(c_id)
     def evalGuid(self):
@@ -184,7 +184,7 @@ class parsePort(parseObj):
         self.p_ext   = 0
         self.lid   = 0
         self.n_id    = 0
-        self.db_activity=False
+        self.rDB=False
     def setPNr(self,p_int):
         self.p_int   = p_int
         if self.p_ext==0:
@@ -199,9 +199,9 @@ class parsePort(parseObj):
         if self.guid=='':
             # Wenn es sich um einen Switchport handelt, dann bekommt der Port die pseudo-GUID <NODEGUID[-10:]>abba<PORT>
             # Diese sollte recht fix sein.
-            nodeguid = self.db.selNodeGUID(self.n_id)
+            nodeguid = self.rDB.selNodeGUID(self.n_id)
             self.guid = "%sabba%s" % (nodeguid,self.p_int)
-        self.p_id = self.db.upsertPort(self)
+        self.p_id = self.rDB.upsertPort(self)
     def __str__(self):
         res = "i%sp%se%sl%sn%s" % (self.p_id,self.p_int,self.p_ext,self.lid,self.n_id)
         return res
@@ -210,15 +210,15 @@ class edgeClass(object):
     def __init__(self,opt,db,cfg,log):
         self.cfg = cfg
         self.opt = opt
-        self.db  = db
+        self.rDB  = db
         self.log = log
     def setInfo(self,row):
         (self.src_gnid, self.src_name, self.dst_gnid, self.dst_name, pos) = row
         #query = "SELECT lid FROM nodes NATURAL JOIN ports WHERE n_id='%s'" % (self.src_gnid)
-        #res = self.db.selOne(query)
+        #res = self.rDB.selOne(query)
         #self.src_lid = res[0]
         #query = "SELECT lid FROM nodes NATURAL JOIN ports WHERE n_id='%s'" % (self.dst_nid)
-        #res = self.db.selOne(query)
+        #res = self.rDB.selOne(query)
         #self.dst_lid = res[0]
         self.edgeOpts = {'pos':pos}
     def setSysInfo(self,row):
@@ -246,7 +246,7 @@ class edgeClass(object):
         self.opts += 'arrowhead = \"none\" minlen = \"3\"'
     def setInTopo(self):
         query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' AND ge_dst_gnid='%s'" % (self.src_gnid,self.dst_gnid)
-        self.db.ins(query)
+        self.rDB.ins(query)
 
 class parseNode(parseObj):
     def __init__(self,db,opt,cfg,allGuids):
@@ -283,11 +283,11 @@ class parseNode(parseObj):
     def insDB(self):
         # Knoten wird guid angelegt
         if self.name:
-            self.n_id = self.db.getIns_ID('nodes',"n_guid='%s' AND n_name='%s'" % (self.guid,self.name),['n_guid','n_name'], [self.guid,self.name],self.opt.debug)
+            self.n_id = self.rDB.getIns_ID('nodes',"n_guid='%s' AND n_name='%s'" % (self.guid,self.name),['n_guid','n_name'], [self.guid,self.name],self.opt.debug)
         else:
-            self.n_id = self.db.getIns_ID('nodes',"n_guid='%s'" % (self.guid),['n_guid',], [self.guid,],self.opt.debug)
+            self.n_id = self.rDB.getIns_ID('nodes',"n_guid='%s'" % (self.guid),['n_guid',], [self.guid,],self.opt.debug)
     def createPort(self,pnr,pguid,lid):
-        port = parsePort(self.db,self.opt,self.cfg,self.allGuids)
+        port = parsePort(self.rDB,self.opt,self.cfg,self.allGuids)
         port.setPNr(pnr)
         port.setNid(self.n_id)
         port.setGuid(pguid)
@@ -308,7 +308,7 @@ class parseNode(parseObj):
         query += " sw_cnt='%s', extSw_cnt='%s', comp_cnt='%s'" % (self.sw_cnt,self.extSw_cnt,self.comp_cnt)
         query += " WHERE n_id='%s'" % self.n_id
         self.deb(query,"p",2)
-        self.db.exe(query)
+        self.rDB.exe(query)
     def getLids(self):
         res = set([])
         for port in self.ports.values():
@@ -329,9 +329,9 @@ class parseNode(parseObj):
         except: raise IOError("Ohne n_id sehen wir alt aus!")
         else:   query += " WHERE n_id='%s'" % n_id
         self.deb(query,"p",2)
-        self.db.exe(query)
+        self.rDB.exe(query)
     def setType(self,typ):
-        self.nt_id = self.db.getIns_ID('nodetypes',"nt_name='%s'" % typ,['nt_name',], [typ,],self.opt.debug)
+        self.nt_id = self.rDB.getIns_ID('nodetypes',"nt_name='%s'" % typ,['nt_name',], [typ,],self.opt.debug)
         self.type = typ
     def setSwitch(self):
         self.setType('switch')
@@ -349,7 +349,7 @@ class parseNode(parseObj):
             return None
         return res
     def createCircle(self,obj):
-        cir_id = self.db.getIns_ID('circles',"n_id='%s' AND pathhex='%s'" % (str(self.n_id),obj),['n_id','pathhex'], [str(self.n_id),obj],self.opt.debug)
+        cir_id = self.rDB.getIns_ID('circles',"n_id='%s' AND pathhex='%s'" % (str(self.n_id),obj),['n_id','pathhex'], [str(self.n_id),obj],self.opt.debug)
         return cir_id
     def setCircleLinks(self,cir_id,prv):
         self.deb("!!Kreisknoten: %s" % self,'l',1)
@@ -370,7 +370,7 @@ class parseNode(parseObj):
 
 class parseLink(parseObj):
     def __init__(self,db,opt,cfg):
-        self.db     = db
+        self.rDB     = db
         self.opt    = opt
         self.cfg    = cfg
     def setOpts(self,sNode,sPort,dNode,dPort):
@@ -380,14 +380,14 @@ class parseLink(parseObj):
             res = dNode.nLinks[sNode]
             #sNode.addLink(dNode,res)
             return res
-        self.src_pId = self.db.getPID(sNode,sPort)
+        self.src_pId = self.rDB.getPID(sNode,sPort)
         self.src     = (sNode,sPort)
         try:
-            self.dst_pId = self.db.getPID(dNode,dPort)
+            self.dst_pId = self.rDB.getPID(dNode,dPort)
             self.dst     = (dNode,dPort)
         except IOError,e:
             if sNode.name=="A1":
-                print "IOError self.db.getPID(dNode,dPort): %s" % e
+                print "IOError self.rDB.getPID(dNode,dPort): %s" % e
                 sys.exit()
             return None
         self.seen    = False
@@ -421,7 +421,7 @@ class parseLink(parseObj):
     def setCircle(self,cir_id):
         self.deb("Kreiskante: %s" % self,'l',1)
         self.circle = True
-        self.db.linkSetCircle(self.src,self.dst,cir_id)
+        self.rDB.linkSetCircle(self.src,self.dst,cir_id)
     def updateDB(self):
         pass
 
@@ -532,13 +532,32 @@ class thePath(object):
         if self.opt.links and self.opt.debug>=deb:
             print msg
 
+def locality_color(val1,val2):
+    color = {
+        0:"#0000ff",
+        1:"#1500e9",
+        2:"#2a00d4",
+        3:"#3f00bf",
+        4:"#5500aa",
+        5:"#6a0094",
+        6:"#7f007f",
+        7:"#94006a",
+        8:"#aa0055",
+        9:"#d4002a",
+        10:"#ff0000",
+            
+    }
+    return "\"%s:%s\"" % (color[(val1/10)],color[(val2/10)])
+    
 class node(object):
     def __str__(self):
         res = "name:%-5s || %s" % (self.name,self.nodeOpts)
         return res
-    def setNodeInfo(self,row):
-        (sg_id, c_id, s_id, n_id, n_status, gn_id, \
-         gn_name, gn_shape) = row
+        
+    def setNodeInfo(self, rDB, row, graph='plain'):
+        self.rDB = rDB
+        (sg_id, c_id, s_id, n_id, \
+         n_status, gn_id, gn_name, gn_shape) = row
         self.sg_id  =  sg_id
         self.c_id   = c_id
         self.s_id   = s_id
@@ -547,15 +566,15 @@ class node(object):
         self.gn_id  = gn_id
         self.nodeOpts['shape']  = gn_shape
         query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
-        res = self.db.sel(query)
+        res = self.rDB.sel(query)
         for row in res:
             (key,val) = row
             self.nodeOpts[key] = val
         statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
-        res = self.db.selOne(statQ)
+        res = self.rDB.selOne(statQ)
         s_rev = res[0]
-        self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id, c_id, s_id, s_rev, n_id)
-        #self.nodeOpts['URL'] = "\"%s.html\"" % self.name
+        if graph=='plain':
+            self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id, c_id, s_id, s_rev, n_id)
         self.nodeOpts['URL'] = "\"index.php?node_details=%s\"" % self.name
 
         if not self.nodeOpts['shape']:
@@ -576,6 +595,15 @@ class node(object):
                 self.nodeOpts['fontcolor']  = 'orange'
             else:
                 self.nodeOpts['fontcolor']  = 'red'
+        if graph=='perf':
+            query = "SELECT * FROM getLocality('%s')" % gn_name
+            res = rDB.selOne(query)
+            if len(res)>=1:
+                (upin_downout, upout_downin) = res[:2]
+                locality = max(upin_downout, upout_downin)
+                self.nodeOpts['style']      = 'filled'
+                self.nodeOpts['fillcolor']  = locality_color(upin_downout, upout_downin)
+                self.nodeOpts['tooltip'] = "\"upIn/downOut:%s%% || upOut/downIn:%s%% \"" % (upin_downout, upout_downin)
     def getNodeOpts(self,design=False):
         opts = "["
         for k,v in self.nodeOpts.items():
@@ -611,9 +639,9 @@ class node(object):
         return c
     def setInTopo(self):
         query = "UPDATE sg_nodes SET in_topo='t' WHERE gn_id='%s'" % self.gn_id
-        self.db.ins(query)
-        query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' OR ge_dst_gnid='%s'"
-        self.db.ins(query)
+        self.rDB.ins(query)
+        query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' OR ge_dst_gnid='%s'" % (self.gn_id, self.gn_id)
+        self.rDB.ins(query)
         
 class nodeNid(node):
     """ Node class based on node_ids, this will lead to a graph that includes all ASICs"""
@@ -621,7 +649,7 @@ class nodeNid(node):
         self.IamIn = IamIn
         self.cfg = cfg
         self.opt = opt
-        self.db = db
+        self.rDB = db
         
         select = "s_id,s_guid,s_name,c_id,n_id,n_name,n_guid,nt_id,nt_name,in_topo,edge_eval,in_sg"
         if n_id!=None:
@@ -631,7 +659,7 @@ class nodeNid(node):
             query = "SELECT %s FROM systems NATURAL JOIN nodes NATURAL JOIN nodetypes WHERE s_name REGEXP '%s' OR n_name REGEXP '%s'" % (select,root,root)
             self.isRoot = True
         if self.opt.debug>=1: print query
-        res = self.db.sel(query)
+        res = self.rDB.sel(query)
         (self.s_id,self.s_guid,self.s_name,self.c_id,self.n_id,self.n_name,self.n_guid,self.nt_id,self.nt_name,self.in_topo,self.edge_eval,in_sg) = res[0]
         query = "SELECT DISTINCT p_lid FROM ports WHERE n_id='%s'" % self.n_id
         if self.opt.debug>=2: print "n_name:'%s', s_name:'%s'"% (self.n_name,self.s_name)
@@ -639,7 +667,7 @@ class nodeNid(node):
             self.name = self.s_name
         else:
             self.name = self.n_name
-        res         = self.db.sel(query)
+        res         = self.rDB.sel(query)
         self.lid    = res[0][0]
         self.root   = None
         self.parent = None
@@ -662,14 +690,14 @@ class nodeGnId(node):
         self.IamIn = IamIn
         self.cfg = cfg
         self.opt = opt
-        self.db = db
+        self.rDB = db
         select = " s.s_id, s_guid, s_name, s.c_id, gn_id, sg_id,gn_name, gn_shape, nt_name, sgn.in_topo"
         query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.s_id=sgn.s_id WHERE gn_id='%s'" % (select,gn_id)
         if self.opt.debug>=2: print query
-        res = self.db.sel(query)
+        res = self.rDB.sel(query)
         if len(res)==0:
             query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.c_id=sgn.c_id WHERE gn_id='%s'" % (select,gn_id)
-            res = self.db.sel(query)
+            res = self.rDB.sel(query)
         (self.s_id, self.s_guid, self.s_name, self.c_id, self.gn_id, self.sg_id, self.gn_name, self.gn_shape, self.nt_name,self.in_topo) = res[0]
         
         if self.in_topo=='f':
@@ -726,7 +754,7 @@ class cacheDB(object):
         self.opt = opt
         self.cfg = cfg
         self.log = log
-        self.db = db
+        self.rDB = db
         self.commitCount = 0
         self.querys      = 0
         if filename is None: filename=":memory:"
@@ -986,12 +1014,12 @@ class cacheDB(object):
         query = "SELECT * FROM %s" % tab
         res = self.sel(query)
         query = "DELETE FROM %s" % tab
-        self.db.exe(query)
+        self.rDB.exe(query)
         for row in res:
             insQ = "INSERT INTO %s VALUES ('%s')" % (tab,"','".join([str(x) for x in row]))
             insQ = insQ.replace("'Null'","Null")
             insQ = insQ.replace("'None'","Null")
-            try: self.db.ins(insQ)
+            try: self.rDB.ins(insQ)
             except UnicodeDecodeError,e:
                 print insQ
                 self.deb(e,2)
@@ -999,7 +1027,7 @@ class cacheDB(object):
     def cloneTab(self,tab):
         query = "SELECT * FROM %s" % tab
         self.deb(query,3)
-        res = self.db.sel(query)
+        res = self.rDB.sel(query)
         for row in res:
             insQ = "INSERT INTO %s VALUES ('%s')" % (tab,"','".join([str(x) for x in row]))
             self.deb(insQ,3)
@@ -1616,9 +1644,10 @@ class cacheDB(object):
             self.ins(query)
 
 class topology(object):
-    def __init__(self,cDB,opt,cfg,log):
+    def __init__(self,rDB,cDB,opt,cfg,log):
         self.log = log
         self.cDB = cDB
+        self.rDB = rDB
         self.opt = opt
         self.cfg = cfg
     def deb(self,msg,deb):
@@ -1627,7 +1656,7 @@ class topology(object):
     def eval(self):
         self.log.start()
         cDB = self.cDB
-        self.root = nodeNid(self.opt,cDB,self.cfg,None)
+        self.root = nodeNid(self.opt, cDB,self.cfg,None)
         # root ist bestimmt, nun schauen wir ob es gleichartige spines gibt in dem Chassis / System
         self.recursiv(self.root)
         self.log.end("evalTopo")
@@ -1704,7 +1733,7 @@ class topology(object):
             else:
                 line = "%s -> %s [arrowhead =\"none\"];" % (sge_src,sge_dst)
             self.write(fd,line)
-    def drawSgNodes(self,fd,sg_id):
+    def drawSgNodes_old(self,fd,sg_id):
         query = "SELECT gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_shape FROM sg_nodes WHERE sg_id='%s' WHERE in_topo='f'" % sg_id
         res = self.cDB.sel(query)
         for row in res:
@@ -1931,7 +1960,7 @@ class myTopo(topology):
             (sg_id, c_id, s_id, n_id, n_state_id, gn_id, \
              gn_name, gn_shape) = row
             item = nodeGnId(self.opt, self.cDB, self.cfg, gn_id)
-            item.setNodeInfo(row)
+            item.setNodeInfo(self.rDB, row, self.graph)
             if not design:
                 opts = item.getNodeOpts()
             self.write(fd,"\"%s\" %s;" % (gn_name,opts))
@@ -1949,26 +1978,25 @@ class myTopo(topology):
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
             item = nodeGnId(self.opt,self.cDB,self.cfg,gn_id)
-            item.setNodeInfo(row)
+            item.setNodeInfo(self.rDB, row, self.graph)
             if not design:
                 opts = item.getNodeOpts(design)
             self.write(fd,"\"%s\" %s;" % (gn_name,opts))
             item.setInTopo()
     def drawNode(self,fd,gn_id, design=False):
-        #query = "SELECT sg_id,c_id,s_id,n_id,gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height FROM sg_nodes WHERE gn_id='%s'" % gn_id
-	query = """SELECT sg_id,c_id,n.s_id,n.n_id,
+        query = """SELECT sg_id,c_id,n.s_id,n.n_id,
                     (SELECT state_name FROM states WHERE state_id=n.n_state_id)
                     AS n_status,
                     gn_id,gn_name,gn_shape                   
                 FROM sg_nodes sgn JOIN nodes n ON sgn.s_id=n.s_id
-		WHERE gn_id='%s'""" % gn_id
+                WHERE gn_id='%s'""" % gn_id
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
             item = nodeGnId(self.opt,self.cDB,self.cfg,gn_id)
-            item.setNodeInfo(row)
+            item.setNodeInfo(self.rDB, row, self.graph)
             if not design:
                 opts = item.getNodeOpts(design)
             self.write(fd,"\"%s\" %s;" % (gn_name,opts))
@@ -2052,6 +2080,7 @@ class Parameter(object):
         self.parser.add_option("-C", dest="netcfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Network configfile (default: %default)")
         self.parser.add_option("-t", dest="topocfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/topology.cfg", action = "store", help = "Topology configfile (default: %default)")
         self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
+        self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
         self.parser.add_option("--circle",dest="circle",default=False, action = "store_true", help = "Show circle debug information")
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
