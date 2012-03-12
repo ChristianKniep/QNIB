@@ -22,6 +22,7 @@ import sys
 import time
 import re
 import random
+import subprocess
 import commands
 
 sys.path.append("/root/QNIB/serverfiles/usr/local/lib/")
@@ -90,7 +91,7 @@ class LOGentry(object):
         self.desc = desc.strip()
     def __str__(self):
         if self.status != "":
-            res = "%s : %s" % (self.desc.ljust(25), self.status)
+            res = "%s : %s" % (self.desc.ljust(35), self.status)
         else:
             res = self.desc
         return res
@@ -173,12 +174,16 @@ class MyApp(object):
         log_e.set_status("ONGOING")
         self.refresh_log()
     def start_server(self, node):
-        cmd = "ssh -n -f %s 'killall qperf ;; /usr/bin/qperf'" % node
-        (out, errc) = commands.getstatusoutput(cmd)
+        cmd = ["/usr/bin/ssh", "-n", "-f", node, "/usr/bin/qperf"]
+        print cmd
+        sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
         time.sleep(1)
     def start_client(self, cli, srv, test, duration):
-        cmd = "ssh -n -f %s 'killall qperf ;; /usr/bin/qperf %s -t %ss %s &>/tmp/qperf.out'" % (cli, srv, duration, test)
-        (out, errc) = commands.getstatusoutput(cmd)
+        cmd = ["/usr/bin/ssh", "-n", "-f", cli, "/usr/bin/qperf", srv, "-t", "%ss" % duration, test]
+        print cmd
+        sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
     def eval_objects(self):
         objs = self.builder.get_objects()
         if len(self.servers)==0 and len(self.srv_free)==0:
@@ -314,6 +319,8 @@ class MyApp(object):
             
             {'cli':'emv110','srv':'emv105','dur':30,'test':'rc_rdma_write_bw'},
             {'cli':'emv104','srv':'emv110','dur':30,'test':'rc_rdma_write_bw'},
+            
+            {'cli':'emv108','srv':'emv109','dur':1,'test':'rc_bi_bw'},
             ]
         for scen in scenarios:
             cli = scen['cli']
