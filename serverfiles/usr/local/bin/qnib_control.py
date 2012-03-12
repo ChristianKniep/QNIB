@@ -1,5 +1,20 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
+#
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
 
 import gtk
 import pango
@@ -92,10 +107,22 @@ class MyApp(object):
         log_win.modify_font(font_desc)
 
         self.ibs = libibsim.IBsim("/root/QNIB/serverfiles/test/netlist.clos5")
-        
+
         log_e = LOGentry("")
         self.log_text = [log_e]*10
-        self.start_services()
+        #self.start_services()
+    def change_buttons(self):
+        objs = self.builder.get_objects()
+        for obj in objs:
+            if type(obj) is gtk.ToggleButton:
+                self.change_button(obj)
+            elif type(obj) is gtk.TextView:
+                self.change_textview(obj)
+            elif type(obj) is gtk.Window:
+                self.change_window(obj)
+            elif type(obj) is gtk.Label:
+                self.change_label(obj)
+
     def run(self):
         try:
             gtk.main()
@@ -172,8 +199,32 @@ class MyApp(object):
         log_list = [x.__str__() for x in self.log_text[-10:]]
         log_list.reverse()
         self.log_buffer.set_text("\n".join(log_list))
+    def change_window(self, obj):
+        pass
+    def change_label(self, obj):
+        """ Change attributes of label widgets """
+        obj.modify_font(pango.FontDescription('bold 10'))
+    def change_textview(self, obj):
+        """ Change color of the textbox"""
+        pass
+        #obj.modify_base(gtk.STATE_NORMAL,gtk.gdk.color_parse('#000000'))
+        #obj.modify_text(gtk.STATE_NORMAL,gtk.gdk.color_parse('#FFFFFF'))
+        #obj.modify_font(pango.FontDescription('Monospace 11'))
+
+    def change_button(self,opt):
+        cmap = opt.get_colormap()
+        color_normal = cmap.alloc_color("darkgrey")
+        color_active = cmap.alloc_color("white")
+        color2 = cmap.alloc_color("lightblue")
+        style = opt.get_style().copy()
+        style.bg[gtk.STATE_NORMAL] = color_normal
+        style.bg[gtk.STATE_ACTIVE] = color_active
+        style.bg[gtk.STATE_PRELIGHT] = color2
+
+        opt.set_style(style)
     def node_toggled(self, opt):
         node = opt.get_name()
+
         node_obj = self.builder.get_object(node)
         if opt.get_active():
             if self.node_list[node]['blocked'] == 2:
@@ -287,6 +338,7 @@ if __name__ == '__main__':
     options = MYparameter()
     options.check()
     app = MyApp(options)
+    app.change_buttons()
     if False:
         app.print_netlist()
         sys.exit()

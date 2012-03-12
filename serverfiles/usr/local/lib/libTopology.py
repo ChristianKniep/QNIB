@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
 
 # Bibliotheken laden
 import re, os, sys, commands,time, random
@@ -539,9 +554,9 @@ class node(object):
         statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
         res = self.db.selOne(statQ)
         s_rev = res[0]
-        self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id,c_id,s_id,s_rev,n_id)
-        self.nodeOpts['URL'] = "\"%s.html\"" % self.name
-        self.nodeOpts['target'] = "\"Nodes\""
+        self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id, c_id, s_id, s_rev, n_id)
+        #self.nodeOpts['URL'] = "\"%s.html\"" % self.name
+        self.nodeOpts['URL'] = "\"index.php?node_details=%s\"" % self.name
 
         if not self.nodeOpts['shape']:
             if self.nt_name=='switch':
@@ -562,7 +577,6 @@ class node(object):
             else:
                 self.nodeOpts['fontcolor']  = 'red'
     def getNodeOpts(self,design=False):
-        #if self.name=="aero8115": print self.nodeOpts
         opts = "["
         for k,v in self.nodeOpts.items():
             if v!="" and v!=None:
@@ -1788,7 +1802,7 @@ class topology(object):
             node = m.group(1)
             opts = m.groups()[1:]
             if node not in ('node','edge','graph'):
-                self.alterNode(node,opts[0])
+                 self.alterNode(node,opts[0])
     def matchGraph(self,line):
         # Befinden wir uns in einem subgraph?
         r = "(diagraph|subgraph)[ \t]+([\_a-zA-Z0-9]+)"
@@ -1853,9 +1867,13 @@ class topology(object):
             raise IOError("Node '%s' nicht vorhanden" % node)
         gn_id = res[0]
         for opt in opts.split(", "):
-            (k,v) = opt.split("=")
-            self.cDB.upsert_sgno(k,v,gn_id)
-
+            opt_dingens = opt.split("=")
+            if len(opt_dingens)==2:
+                (k,v) = opt_dingens
+            elif len(opt_dingens)==3:
+                (k, v) = (opt_dingens[0], "%s=%s" % tuple(opt_dingens[1:]))
+            self.cDB.upsert_sgno(k, v, gn_id)
+            
 class myTopo(topology):
     """ Ueberladen der eigentlichen topology-Klasse """
     def create(self,graph=None):

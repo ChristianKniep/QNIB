@@ -1,7 +1,23 @@
 #!/usr/bin/env python
-#  Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
+# -*- coding: utf-8 -*-
 #
-#  Create RRD
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
+# Inspired by the Work of Corey due to his rrd.py-Examplelibrary:
+# http://code.google.com/p/rrdpy/
+## Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
 
 import sys
 import os
@@ -59,7 +75,7 @@ def update_err(opt, datab, interval):
     for node, ports in data.items():
         for p_ext, time_stamps in ports.items():
             rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
+            my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
             my_rrd.create_err(interval, stamps[0])
@@ -74,8 +90,8 @@ def update_perf(opt, datab, interval):
                 FROM perfdata   NATURAL JOIN perfkeys
                         NATURAL JOIN ports
                         NATURAL JOIN nodes
-                WHERE pk_name in ('xmit_data', 'rcv_data')
-                ORDER BY pd_id ASC LIMIT 500"""
+                WHERE   pk_name in ('xmit_data', 'rcv_data')
+                ORDER BY pd_id ASC LIMIT 1000"""
     res = datab.sel(query)
     data = {}
     pd_ids = []
@@ -98,8 +114,7 @@ def update_perf(opt, datab, interval):
     
     for node, ports in data.items():
         for p_ext, time_stamps in ports.items():
-            rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
+            my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
             my_rrd.create_perf(interval, stamps[0])
@@ -117,7 +132,6 @@ def main(argv=None):
     count_res = 1
     while count_res > 0:
         count_res = update_perf(opt, datab, interval)
-    
     count_res = 1
     while count_res > 0:
         count_res = update_err(opt, datab, interval)

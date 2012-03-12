@@ -1,7 +1,23 @@
 #!/usr/bin/env python
-#  Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
+# -*- coding: utf-8 -*-
 #
-#  Create RRD
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
+# Inspired by the Work of Corey due to his rrd.py-Examplelibrary:
+# http://code.google.com/p/rrdpy/
+## Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
 
 import sys
 import os
@@ -25,11 +41,9 @@ class MYparameter(libTopology.Parameter):
 
 def main(argv=None):
     opt = MYparameter(argv)
-    
+
     datab = dbCon.dbCon(opt)
-    
-    
-    
+
     query = """SELECT DISTINCT n_name, p_ext
                 FROM ports NATURAL JOIN nodes
                 ORDER BY n_name,p_ext;"""
@@ -42,19 +56,8 @@ def main(argv=None):
         data[n_name].append(p_ext)
     
     for node, ports in data.items():
-        html_file = open("/srv/www/qnib/%s.html" % node, "w")
-        html_file.write("<h2>%s</h2>\n" % node)
-        html_file.write("<h3>Performance</h3>\n")
-        for p_ext in ports:
-            html_file.write("<img src=\"%s_%s_perf.png\" />" % (node, p_ext))
-        html_file.write("<h3>Error</h3>\n")
-        for p_ext in ports:
-            html_file.write("<img src=\"%s_%s_err.png\" />" % (node, p_ext))
-            
-        for p_ext in ports:
-            rrd_file = "%s_%s" % (node, p_ext)
-            my_rrd = rrd.RRD(rrd_file)
-            my_rrd.graph(60)
+        my_rrd = rrd.RRD(node)
+        my_rrd.html5(15,'1331408194')
         
         
      

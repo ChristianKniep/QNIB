@@ -1,38 +1,46 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
-#  rrd.py
-#  Simple RRDTool wrapper
-#  Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
+# This file is part of QNIB.  QNIB is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General Public
+# License as published by the Free Software Foundation, version 2.
 #
-#  Download the Windows version of RRDTool from:
-#    http://www.gknw.net/mirror/rrdtool/
-# 
-#  You may need these fonts if RRDTool throws an error when you graph:
-#    http://dejavu.sourceforge.net/wiki/index.php/Main_Page
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Copyright Christian Kniep, 2012
+# Inspired by the Work of Corey due to his rrd.py-Examplelibrary:
+# http://code.google.com/p/rrdpy/
+## Copyright (c) 2008 Corey Goldberg (corey@goldb.org)
 
 
 import os
 import time
 import subprocess
+import re
+import sys
 
+def exp2int(zahl):
+    if zahl in ('0','-nan'):
+        return str(0)
+    else:
+        reg = '(\d+),(\d+)e\+(\d+)'
+        mat = re.search(reg,zahl)
+        if mat:
+            (pre, post, exp) = mat.groups()
+            return str(int((float(pre)+float(".%s" % post))*(10**int(exp))))
 
 class RRD(object):
-    def __init__(self, file_name, vertical_label='test'):
-        self.file_perf = "%s_perf" % file_name
-        self.rrd_perf = "/srv/rrd/qnib/%s.rrd" % self.file_perf
-        self.png_perf = "/srv/www/qnib/%s.png" % self.file_perf
-        self.file_err = "%s_err" % file_name
-        self.rrd_err = "/srv/rrd/qnib/%s.rrd" % self.file_err
-        self.png_err = "/srv/www/qnib/%s.png" % self.file_err
-        self.vertical_label = vertical_label
-        self.rrd_color =  {
-            'xmit_data':"FF0000",
-            'rcv_data':"00FF00",
-            'symbol_err_cnt':'FF0000',
-            'xmit_discards':'00FF00',
-            'vl15_dropped':'0000FF',
-            'link_downed':'FF00FF'
-            }
+    def __init__(self, node, vertical_label='test'):
+        self.node_name = node
+        self.html_file = "/srv/www/qnib/%s.html" % node
+        self.rrd_base =  "/srv/rrd/qnib/"
 
     def create_rrd(self, interval):
         self.create_perf(interval)
@@ -44,7 +52,7 @@ class RRD(object):
         else:
             print self.file_perf
         interval = str(interval) 
-        interval_mins = float(interval) / 60  
+        interval_mins = float(interval) / 60
         heartbeat = str(int(interval) * 2)
         ds_arr = [
             'DS:xmit_data:GAUGE:%s:U:U' % heartbeat,
@@ -59,10 +67,7 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(30/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(120/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(1440/interval_mins)),
+            'RRA:AVERAGE:0.5:30:3600'
             ])
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
@@ -86,10 +91,7 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:1:%s' % str(int(4000/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(30/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(120/interval_mins)),
-            'RRA:AVERAGE:0.5:%s:800' % str(int(1440/interval_mins)),
+            'RRA:AVERAGE:0.5:30:3600'
             ])
 
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
@@ -118,63 +120,168 @@ class RRD(object):
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
     
-    def graph(self, mins):
-        self.graph_perf(mins)
-        self.graph_err(mins)
+    def html5(self, mins,s_time='now'):
+        self.html_code = """<!DOCTYPE HTML>
+<html>
+    <head>
+      <link rel="stylesheet" href="css/combined.css"/>
+      <script src="js/jquery.min.js"></script>
+      <script src="js/visualize.jQuery.js"></script>
+      <script>
+        $(function(){
+          $('table.line').visualize({type: 'line', parseDirection:'y'});
+         });
+      </script>
+    </head>
+    <body>
+"""
+        self.html5_tab(mins, s_time, 'perf')
+        self.html5_tab(mins, s_time, 'err')
+
+        self.html_code += """
+    </body>
+</html>
+"""
+        file_d = open(self.html_file, "w")
+        file_d.write(self.html_code)
+        file_d.close()
         
-    def graph_perf(self, mins):       
-        start_time = 'now-%s' % (mins * 60)  
-        end_time = 'now'
-        ds_name = 'Performance Chart'
-        width = '400'
-        height = '150'
-        cmd_graph = ['rrdtool', 'graph', self.png_perf]
-        ds_names = ['xmit_data', 'rcv_data']
-        for ds_name in ds_names:
-            cmd_graph.append('DEF:%s=%s:%s:AVERAGE' % (ds_name, self.rrd_perf, ds_name))
-            cmd_graph.append('LINE:%s#%s:%s' % (ds_name, self.rrd_color[ds_name], ds_name))
-            cmd_graph.append('VDEF:%slast=%s,LAST' % (ds_name, ds_name))
-            cmd_graph.append('VDEF:%savg=%s,AVERAGE' % (ds_name, ds_name))
-            #cmd_graph.append('GPRINT:%slast:last=%%6.2lf\n' % ds_name)
-        cmd_graph.extend([
-                '--title="%s"' % self.rrd_perf,
-                '--vertical-label="%s"' % self.vertical_label,
-                '--start=%s' % start_time,
-                '--end=%s' % end_time,
-                '--width=%s' % width,
-                '--height=%s' % height,
-                '--lower-limit="0"'
-                ])
-        process = subprocess.Popen(cmd_graph, shell=False, stdout=subprocess.PIPE)
-        process.communicate()
+    def html5_tab(self, mins,s_time, typ):
+        start_time = '%s-%s' % (s_time, mins * 60)  
+        end_time = s_time
+        
+        reg = "%s_(\d+)_%s\.rrd" % (self.node_name,typ)
+        td_vals = {}
+        td_vals_by_stamp = {}
+        plain_keys = set([])
+        plain_ports = []
+        files = os.listdir(self.rrd_base)
+        for file_name in [x for x in files if re.match(reg, x)]:
+            mat = re.match(reg, file_name)
+            p_ext = mat.group(1)
+            plain_ports.append(p_ext)
+            cmd_html = ['rrdtool', 'fetch',
+                        "%s%s" % (self.rrd_base, file_name),
+                        '-s',start_time,'-e',end_time,'AVERAGE']
+            process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
     
-    def graph_err(self, mins):       
-        start_time = 'now-%s' % (mins * 60)  
-        end_time = 'now'
-        ds_name = 'test'
-        width = '400'
-        height = '150'
-        cmd_graph = ['rrdtool', 'graph', self.png_err]
-        ds_names = ['symbol_err_cnt', 'xmit_discards', \
-                    'vl15_dropped', 'link_downed']
-        for ds_name in ds_names:
-            cmd_graph.append('DEF:%s=%s:%s:AVERAGE' % (ds_name, self.rrd_err, ds_name))
-            cmd_graph.append('LINE:%s#%s:%s' % (ds_name, self.rrd_color[ds_name], ds_name))
-            cmd_graph.append('VDEF:%slast=%s,LAST' % (ds_name, ds_name))
-            cmd_graph.append('VDEF:%savg=%s,AVERAGE' % (ds_name, ds_name))
-            #cmd_graph.append('GPRINT:%slast:last=%%6.2lf\n' % ds_name)
-        cmd_graph.extend([
-                '--title="%s"' % self.rrd_err,
-                '--vertical-label="%s"' % self.vertical_label,
-                '--start=%s' % start_time,
-                '--end=%s' % end_time,
-                '--width=%s' % width,
-                '--height=%s' % height,
-                '--lower-limit="0"'
-                ])
-        process = subprocess.Popen(cmd_graph, shell=False, stdout=subprocess.PIPE)
-        process.communicate()
-            
-            
+            (out, errc) = process.communicate()
+            reg_head = "[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)"
+            for line in out.split('\n'):
+                if re.match('[ \t]+[a-z_0-9]', line):
+                    td_keys = []
+                    td_heads = line.split()
+                    for td_head in td_heads:
+                        plain_keys.add(td_head)
+                        key = "%s[%s]" % (td_head, p_ext)
+                        td_keys.append(key)
+                        if key not in td_vals.keys():
+                            td_vals[key] = {}
+                elif re.match('\d+', line):
+                    c = 0
+                    td_bodys = line.split()
+                    stamp = td_bodys[0].replace(":","")
+                    if stamp not in td_vals_by_stamp.keys():
+                        td_vals_by_stamp[stamp] = {}
+                    for td_body in td_bodys[1:]:
+                        val = exp2int(td_body)
+                        td_vals[td_keys[c]][stamp] = val
+                        td_vals_by_stamp[stamp][td_keys[c]] = val
+                        c += 1
+
+        plain_ports.reverse()
+        val_keys = []
+        for plain_port in plain_ports:
+            for plain_key in plain_keys:
+                val_keys.append("%s[%s]" % (plain_key, plain_port))
+        ## Table start
+        if typ=='perf':
+            tab_typ = "Performance"
+        elif typ=='err':
+            tab_typ = "Errorcounter"
+        else:
+            tab_typ = "Unkown typ"
+        self.html_code += """
+        <table class="line" style="display:none;">
+            <caption>%s %s</caption>
+            <thead>
+                <tr>
+                  <td></td>
+                  <th>%s</th>
+                </tr>
+            </thead>
+            <tbody>""" % (tab_typ, self.node_name,
+                "</th>\n                   <th>".join(val_keys))
+        for stamp, vals in td_vals_by_stamp.items():
+            self.html_code += """
+            <tr>
+                <th>%s</th>
+                """ % time.strftime("%H:%M", time.localtime(int(stamp)))
+            self.html_code += """<td>%s</td>
+            </tr>
+            """ % "</td>\n                <td>".join(vals.values())
+
+        self.html_code += """
+            </tbody>
+        </table>
+        """
+    def html5_err(self, mins,s_time):
+        start_time = '%s-%s' % (s_time, mins * 60)  
+        end_time = s_time
+        
+        reg = "%s_(\d+)_err\.rrd" % self.node_name
+        for root, dirs, files in os.walk(self.rrd_base):
+            for file_name in files:
+                mat = re.match(reg, file_name)
+                if not mat:
+                    continue
+                p_ext = mat.group(1)
+                cmd_html = ['rrdtool', 'fetch',
+                            "%s%s" % (self.rrd_base, file_name),
+                            '-s',start_time,'-e',end_time,'AVERAGE']
+                process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
+        
+                (out, errc) = process.communicate()
+                self.html_code += """
+                <table class="line" style="display:none;">
+                    <caption>Errorcounter %s external port %s</caption>
+                    <thead>
+                    <tr>
+                        <td></td>
+                        <th>Symbol ErrCnt</th>
+                        <th>Xmit Discards</th>
+                        <th>VL15 dropped</th>
+                        <th>Link downed</th>
+                        </tr>
+                    </thead>
+                    <tbody>""" % (self.node_name, p_ext)
+                    
+                for line in out.split('\n'):
+                    if not re.match('\d+', line): continue
+                    try:
+                        (mat0, mat1, mat2, mat3, mat4) = line.split()
+                    except ValueError,e:
+                        print line
+                        raise ValueError(e)
+                    stamp = re.search('(\d+)', mat0).group(1)
+                    val1 = exp2int(mat1)
+                    val2 = exp2int(mat2)
+                    val3 = exp2int(mat3)
+                    val4 = exp2int(mat4)
+                    self.html_code += """
+                        <tr>
+                            <th>%s</th>
+                            <td>%s</td>
+                            <td>%s</td>
+                            <td>%s</td>
+                            <td>%s</td>
+                        </tr>
+                    """ % (time.strftime("%H:%M", time.localtime(int(stamp))),
+                           val1, val2, val3, val4)
+        self.html_code += """
+            </tbody>
+        </table>
+        """
+        
 class RRDException(Exception): pass
 
