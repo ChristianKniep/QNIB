@@ -67,7 +67,8 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:30:3600'
+            'RRA:AVERAGE:0.5:6:3600',
+            #'RRA:AVERAGE:0.5:30:3600',
             ])
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
@@ -94,7 +95,8 @@ class RRD(object):
             ])
         cmd_create.extend(ds_arr)
         cmd_create.extend([
-            'RRA:AVERAGE:0.5:30:3600'
+            'RRA:AVERAGE:0.5:6:3600',
+            #'RRA:AVERAGE:0.5:30:3600'
             ])
 
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
