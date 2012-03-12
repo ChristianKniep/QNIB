@@ -71,7 +71,7 @@ class parseObj(object):
         self.name       = False
         self.id         = self.__repr__().split("at ")[1][-5:-1]
     def setName(self,name):
-        self.hostPat    = {} #self.cfg.get("hostpat")
+        self.hostPat    = self.cfg.get("hostpat")
         self.name       = name
         self.evalName()
     def evalName(self):
@@ -1936,21 +1936,23 @@ class myTopo(topology):
                 opts = item.getNodeOpts(design)
             self.write(fd,"\"%s\" %s;" % (gn_name,opts))
             item.setInTopo()
-    def drawNode(self,fd,gn_id):
+    def drawNode(self,fd,gn_id, design=False):
         #query = "SELECT sg_id,c_id,s_id,n_id,gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height FROM sg_nodes WHERE gn_id='%s'" % gn_id
-        query = """SELECT sg_id,c_id,s_id,n_id,
-                    (SELECT state_name FROM states WHERE state_id=n_state_id)
+	query = """SELECT sg_id,c_id,n.s_id,n.n_id,
+                    (SELECT state_name FROM states WHERE state_id=n.n_state_id)
                     AS n_status,
-                    gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height
-                FROM sg_nodes WHERE gn_id='%s'""" % gn_id
+                    gn_id,gn_name,gn_shape                   
+                FROM sg_nodes sgn JOIN nodes n ON sgn.s_id=n.s_id
+		WHERE gn_id='%s'""" % gn_id
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
-            (sg_id,c_id,s_id,n_id,gn_id,gn_name,gn_pos,gn_shape,gn_width,gn_height) = row
+            (sg_id, c_id, s_id, n_id, n_status, \
+             gn_id, gn_name, gn_shape) = row
             item = nodeGnId(self.opt,self.cDB,self.cfg,gn_id)
             item.setNodeInfo(row)
             if not design:
-                opts = item.getNodeOpts()
+                opts = item.getNodeOpts(design)
             self.write(fd,"\"%s\" %s;" % (gn_name,opts))
             item.setInTopo()
     def drawGEdges(self,fd,design):
