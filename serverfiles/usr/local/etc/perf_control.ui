@@ -454,8 +454,8 @@
               </packing>
             </child>
             <child>
-              <object class="GtkButton" id="start_scenario">
-                <property name="label" translatable="yes">Start Scenario</property>
+              <object class="GtkButton" id="scenario_3d">
+                <property name="label" translatable="yes">3day Scenario</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="receives_default">True</property>
@@ -463,6 +463,18 @@
               </object>
               <packing>
                 <property name="position">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="scenario_30m">
+                <property name="label" translatable="yes">30min Scenario</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <signal name="clicked" handler="start_scenario"/>
+              </object>
+              <packing>
+                <property name="position">2</property>
               </packing>
             </child>
             <child>
@@ -474,7 +486,7 @@
                 <signal name="clicked" handler="refresh_nodes"/>
               </object>
               <packing>
-                <property name="position">2</property>
+                <property name="position">3</property>
               </packing>
             </child>
             <child>
@@ -486,7 +498,7 @@
                 <signal name="clicked" handler="exit"/>
               </object>
               <packing>
-                <property name="position">3</property>
+                <property name="position">4</property>
               </packing>
             </child>
           </object>

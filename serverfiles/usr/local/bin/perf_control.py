@@ -91,7 +91,7 @@ class LOGentry(object):
         self.desc = desc.strip()
     def __str__(self):
         if self.status != "":
-            res = "%s : %s" % (self.desc.ljust(35), self.status)
+            res = "%s : %s" % (self.desc.ljust(60), self.status)
         else:
             res = self.desc
         return res
@@ -309,18 +309,26 @@ class MyApp(object):
         print "Still running:"
         print "  srv: %s // cli: %s" % (", ".join(all_srv), ", ".join(all_cli))
     def start_scenario(self, obj):
+        mat = re.search("(\d+)(d|m)",obj.get_name())
+        if mat:
+            (dec, unit) = mat.groups()
+            if unit=="m":
+                set_dur = int(dec)
+            elif unit == "d":
+                set_dur = int(dec)*24*60*60
+        else:
+            raise IOError
         scenarios = [
-            {'cli':'emv107','srv':'emv104','dur':30,'test':'rc_bi_bw'},
-            {'cli':'emv106','srv':'emv111','dur':30,'test':'rc_bi_bw'},
-            {'cli':'emv109','srv':'emv108','dur':30,'test':'rc_bi_bw'},
+            {'cli':'emv107','srv':'emv104','dur':set_dur,'test':'rc_bi_bw'},
+            {'cli':'emv106','srv':'emv111','dur':set_dur,'test':'rc_bi_bw'},
             
-            {'cli':'emv105','srv':'emv106','dur':30,'test':'rc_rdma_read_bw'},
-            {'cli':'emv111','srv':'emv107','dur':30,'test':'rc_rdma_read_bw'},
+            {'cli':'emv109','srv':'emv108','dur':set_dur,'test':'rc_rdma_read_bw'},
+            {'cli':'emv105','srv':'emv106','dur':set_dur,'test':'rc_rdma_read_bw'},
+            {'cli':'emv111','srv':'emv107','dur':set_dur,'test':'rc_rdma_read_bw'},
             
-            {'cli':'emv110','srv':'emv105','dur':30,'test':'rc_rdma_write_bw'},
-            {'cli':'emv104','srv':'emv110','dur':30,'test':'rc_rdma_write_bw'},
+            {'cli':'emv110','srv':'emv105','dur':set_dur,'test':'rc_rdma_write_bw'},
+            {'cli':'emv104','srv':'emv110','dur':set_dur,'test':'rc_rdma_write_bw'},
             
-            {'cli':'emv108','srv':'emv109','dur':1,'test':'rc_bi_bw'},
             ]
         for scen in scenarios:
             cli = scen['cli']
