@@ -151,6 +151,7 @@ class checks(object):
         
         if self.opt.file=="":
             cmd = "sudo  LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so /usr/local/sbin/ibnetdiscover -g"
+            cmd = "sudo /usr/local/sbin/ibnetdiscover -g"
             (ec,out) = commands.getstatusoutput(cmd)
             if ec!=0:
                 self.statusList = [out+"ibnetdiscover failed"]

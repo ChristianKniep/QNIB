@@ -78,9 +78,9 @@ def update_err(opt, datab, interval):
             my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
-            my_rrd.create_err(interval, stamps[0])
+            my_rrd.create_err(interval, p_ext, stamps[0])
             ins = data[node][p_ext]
-            my_rrd.update_err(ins)
+            my_rrd.update_err(p_ext, ins)
     return count_res
 
 def update_perf(opt, datab, interval):
@@ -117,9 +117,9 @@ def update_perf(opt, datab, interval):
             my_rrd = rrd.RRD(node, p_ext)
             stamps = time_stamps.keys()
             stamps.sort()
-            my_rrd.create_perf(interval, stamps[0])
+            my_rrd.create_perf(interval, p_ext, stamps[0])
             ins = data[node][p_ext]
-            my_rrd.update_perf(ins)
+            my_rrd.update_perf(p_ext, ins)
     return count_res
 
 

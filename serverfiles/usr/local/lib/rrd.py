@@ -30,11 +30,12 @@ def exp2int(zahl):
     if zahl in ('0','-nan'):
         return str(0)
     else:
-        reg = '(\d+),(\d+)e\+(\d+)'
+        reg = '(\d+)[,\.](\d+)e\+(\d+)'
         mat = re.search(reg,zahl)
         if mat:
             (pre, post, exp) = mat.groups()
-            return str(int((float(pre)+float(".%s" % post))*(10**int(exp))))
+            res = str(int((float(pre)+float(".%s" % post))*(10**int(exp))))
+            return res
 
 class RRD(object):
     def __init__(self, node, vertical_label='test'):
@@ -46,11 +47,10 @@ class RRD(object):
         self.create_perf(interval)
         self.create_err(interval)
 
-    def create_perf(self, interval, start=None):  
-        if os.path.exists(self.rrd_perf):
+    def create_perf(self, interval, p_ext, start=None):  
+        rrd_perf = "%s/%s_%s_perf.rrd" % (self.rrd_base, self.node_name, p_ext)
+        if os.path.exists(rrd_perf):
             return
-        else:
-            print self.file_perf
         interval = str(interval) 
         interval_mins = float(interval) / 60
         heartbeat = str(int(interval) * 2)
@@ -59,7 +59,7 @@ class RRD(object):
             'DS:rcv_data:GAUGE:%s:U:U' % heartbeat,
             ]
                   
-        cmd_create = ['rrdtool', 'create', self.rrd_perf, '--step', interval]
+        cmd_create = ['rrdtool', 'create', rrd_perf, '--step', interval]
         if start != None:
             cmd_create.extend([
                 '--start',
@@ -72,7 +72,10 @@ class RRD(object):
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
         
-    def create_err(self, interval, start=None):  
+    def create_err(self, interval, p_ext, start=None):  
+        rrd_err = "%s/%s_%s_err.rrd" % (self.rrd_base, self.node_name, p_ext)
+        if os.path.exists(rrd_err):
+            return
         interval = str(interval) 
         interval_mins = float(interval) / 60  
         heartbeat = str(int(interval) * 2)
@@ -83,7 +86,7 @@ class RRD(object):
             'DS:link_downed:GAUGE:%s:U:U' % heartbeat
             ]
                   
-        cmd_create = ['rrdtool', 'create', self.rrd_err, '--step', interval]
+        cmd_create = ['rrdtool', 'create', rrd_err, '--step', interval]
         if start != None:
             cmd_create.extend([
                 '--start',
@@ -97,8 +100,9 @@ class RRD(object):
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
 
-    def update_perf(self, ins):
-        cmd_update = ['rrdtool', 'update', self.rrd_perf]
+    def update_perf(self, p_ext, ins):
+        rrd_perf = "%s/%s_%s_perf.rrd" % (self.rrd_base, self.node_name, p_ext)
+        cmd_update = ['rrdtool', 'update', rrd_perf]
         stamps = ins.keys()
         stamps.sort()
         for stamp in stamps:
@@ -108,8 +112,9 @@ class RRD(object):
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
     
-    def update_err(self, ins):
-        cmd_update = ['rrdtool', 'update', self.rrd_err]
+    def update_err(self, p_ext, ins):
+        rrd_err = "%s/%s_%s_err.rrd" % (self.rrd_base, self.node_name, p_ext)
+        cmd_update = ['rrdtool', 'update', rrd_err]
         stamps = ins.keys()
         stamps.sort()
         for stamp in stamps:
@@ -136,7 +141,7 @@ class RRD(object):
     <body>
 """
         self.html5_tab(mins, s_time, 'perf')
-        self.html5_tab(mins, s_time, 'err')
+        #self.html5_tab(mins, s_time, 'err')
 
         self.html_code += """
     </body>
@@ -146,11 +151,11 @@ class RRD(object):
         file_d.write(self.html_code)
         file_d.close()
         
-    def html5_tab(self, mins,s_time, typ):
+    def html5_tab(self, mins, s_time, typ):
         start_time = '%s-%s' % (s_time, mins * 60)  
         end_time = s_time
         
-        reg = "%s_(\d+)_%s\.rrd" % (self.node_name,typ)
+        reg = "%s_(\d+)_%s\.rrd" % (self.node_name, typ)
         td_vals = {}
         td_vals_by_stamp = {}
         plain_keys = set([])
@@ -188,7 +193,9 @@ class RRD(object):
                         td_vals[td_keys[c]][stamp] = val
                         td_vals_by_stamp[stamp][td_keys[c]] = val
                         c += 1
-
+        if False:
+            for k, v in td_vals.items():
+                print k, v
         plain_ports.reverse()
         val_keys = []
         for plain_port in plain_ports:
@@ -212,14 +219,19 @@ class RRD(object):
             </thead>
             <tbody>""" % (tab_typ, self.node_name,
                 "</th>\n                   <th>".join(val_keys))
-        for stamp, vals in td_vals_by_stamp.items():
+        stamps = td_vals_by_stamp.keys()
+        stamps.sort()
+        for stamp in stamps[:-1]:
+            #for stamp, vals in td_vals_by_stamp.items():
+            vals = td_vals_by_stamp[stamp]
+            rrd_vals = [x for x in vals.values() if x!=None]
             self.html_code += """
             <tr>
                 <th>%s</th>
                 """ % time.strftime("%H:%M", time.localtime(int(stamp)))
             self.html_code += """<td>%s</td>
             </tr>
-            """ % "</td>\n                <td>".join(vals.values())
+            """ % "</td>\n                <td>".join(rrd_vals)
 
         self.html_code += """
             </tbody>
