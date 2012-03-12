@@ -84,6 +84,8 @@ class LOGentry(object):
         self.status = status.strip()
     def add_status(self, msg):
         self.status += msg
+    def add_desc(self, msg):
+        self.desc += msg
     def set_desc(self, desc):
         self.desc = desc.strip()
     def __str__(self):
@@ -102,7 +104,7 @@ class MyApp(object):
         self.builder.connect_signals(self)
         log_win = self.builder.get_object("log")
         self.log_buffer = log_win.get_buffer()
-        arr = ["Starting..."]
+        arr = []
         arr.extend([""]*9)
         self.log_buffer.set_text("\n".join(arr))
         font_desc = pango.FontDescription('Courier 10')
@@ -120,33 +122,29 @@ class MyApp(object):
         log_e = LOGentry("")
         self.log_text = [log_e]*10
         dst_obj = self.builder.get_object("src_emv111")
-        #dst_obj.set_active()
     def start_qperf(self, obj):
-        log_e = LOGentry("Starting qperf pair")
-        self.add_log(log_e)
         test_read_obj = self.builder.get_object("rc_rdma_read_bw")
         test_write_obj = self.builder.get_object("rc_rdma_write_bw")
         test_bi_obj  = self.builder.get_object("rc_bi_bw")
         if test_read_obj.get_active():
             test = "rc_rdma_read_bw"
+            dir = "<-"
         elif test_write_obj.get_active():
-            test = "rc_rdma_read_bw"
+            test = "rc_rdma_write_bw"
+            dir = "->"
         elif test_bi_obj.get_active():
             test = "rc_bi_bw"
-        log_e.set_desc("Starting qperf pair (test:%s)" % test)
-        self.refresh_log()
+            dir = "<>"
         dur_obj = self.builder.get_object("duration_min")
         dur_min = int(dur_obj.get_text())
-        log_e.set_desc("Starting qperf pair (test:%s, dur:%smin) " % (test,dur_min))
-        self.refresh_log()
         dur_sec = 60*dur_min
+        log_e = LOGentry("Starting %smin qperf pair" % dur_min)
+        self.add_log(log_e)
         stamp = int(time.time())
-        stamp_end = int(1.1*dur_sec)+stamp
+        stamp_end = int(dur_sec)+stamp+15
         
         # Start Servers
         srv = self.next_srv
-        log_e.set_desc("Starting qperf pair (test:%s, dur:%smin, srv:%s)" % (test, dur_min, srv))
-        self.refresh_log()
         srv_obj = self.builder.get_object("srv_%s" % srv)
         srv_obj.set_property('visible', False)
         self.srv_free -= set([srv])
@@ -155,11 +153,12 @@ class MyApp(object):
         self.start_server(srv)
         if stamp_end not in self.srv_proc.keys():
             self.srv_proc[stamp_end] = []
-        self.srv_proc[stamp_end].append(srv)
+        self.srv_proc[stamp_end].append((srv, log_e))
         
         # Start Client
         cli = self.next_cli
-        log_e.set_desc("Starting qperf pair (test:%s, dur:%smin, srv:%s, cli:%s)" % (test, dur_min, srv, cli))
+        log_stat= "%s%s%s" % (cli,dir,srv)
+        log_e.add_desc(log_stat)
         self.refresh_log()
         cli_obj = self.builder.get_object("cli_%s" % cli)
         cli_obj.set_property('visible', False)
@@ -169,29 +168,17 @@ class MyApp(object):
         if stamp_end not in self.cli_proc.keys():
             self.cli_proc[stamp_end] = []
         self.start_client(cli, srv, test, dur_sec)
-        self.cli_proc[stamp_end].append(cli)
+        self.cli_proc[stamp_end].append((cli, log_e))
         
-        print srv,test,cli,stamp,stamp_end
-    def start_server(self,node):
-        log_e = LOGentry("Starting server on '%s'" % node)
-        self.add_log(log_e)
-        cmd = "ssh -n -f %s 'killall qperf ; /usr/bin/qperf &'" % node
+        log_e.set_status("ONGOING")
+        self.refresh_log()
+    def start_server(self, node):
+        cmd = "ssh -n -f %s 'killall qperf ;; /usr/bin/qperf'" % node
         (out, errc) = commands.getstatusoutput(cmd)
-        if errc==0:
-            log_e.set_status('OK')
-        else:
-            log_e.set_status('FAIL - EC:%s' % errc)
         time.sleep(1)
     def start_client(self, cli, srv, test, duration):
-        log_e = LOGentry("Starting client on '%s' connecting to server '%s'" % (cli, srv))
-        self.add_log(log_e)
-        cmd = "ssh -n -f %s 'killall qperf ; /usr/bin/qperf %s -t %ss %s &>/tmp/qperf.out &'" % (cli, srv, duration, test)
+        cmd = "ssh -n -f %s 'killall qperf ;; /usr/bin/qperf %s -t %ss %s &>/tmp/qperf.out'" % (cli, srv, duration, test)
         (out, errc) = commands.getstatusoutput(cmd)
-        if errc==0:
-            log_e.set_status('OK')
-        else:
-            log_e.set_status('FAIL - EC:%s' % errc)
-        
     def eval_objects(self):
         objs = self.builder.get_objects()
         if len(self.servers)==0 and len(self.srv_free)==0:
@@ -215,22 +202,21 @@ class MyApp(object):
             if mat_cli_srv:
                 (pre, name) = mat_cli_srv.groups()
                 if pre=='srv':
-                    print "Init next_srv with %s" % name
                     self.next_srv = name
                 elif pre=="cli":
-                    print "Init next_cli with %s" % name
                     self.next_cli = name
                 return
             # Testtype buttons
             elif mat_test:
                 name = obj.get_name()
-                print "Init test_type with %s" % name
                 self.test_type = name
     def run(self):
         try:
             gtk.main()
         except KeyboardInterrupt:
             pass
+    def exit(self, obj):
+        self.quit()
     def quit(self):
         gtk.main_quit()
     def rand_press(self):
@@ -268,8 +254,7 @@ class MyApp(object):
         """ Change color of the textbox"""
         #obj.modify_base(gtk.STATE_NORMAL,gtk.gdk.color_parse('#000000'))
         #obj.modify_text(gtk.STATE_NORMAL,gtk.gdk.color_parse('#FFFFFF'))
-        #obj.modify_font(pango.FontDescription('Monospace 11'))
-        pass
+        obj.modify_font(pango.FontDescription('Monospace 10'))
     def change_button(self,opt):
         cmap = opt.get_colormap()
         color_normal = cmap.alloc_color("darkgrey")
@@ -295,36 +280,58 @@ class MyApp(object):
         for end, srv_list in self.srv_proc.items():
             if now>end:
                 while len(srv_list)>0:
-                    node = srv_list.pop()
-                    print "Server on '%s' is going to die" % node
+                    (node,log_e) = srv_list.pop()
                     cmd = "ssh -n -f %s 'killall qperf'" % node
                     (out, errc) = commands.getstatusoutput(cmd)
                     srv_obj = self.builder.get_object("srv_%s" % node)
                     srv_obj.set_property('visible', True)
+                    log_e.set_status("DONE")
             else:
-                print "%s<%s" % (now,end)
-                all_srv.extend(srv_list)
+                all_srv.extend([x[0] for x in srv_list])
                 
         for end, cli_list in self.cli_proc.items():
             if now>end:
                 while len(cli_list)>0:
-                    node = cli_list.pop()
-                    print "Client on '%s' finished" % node
+                    (node, log_e) = cli_list.pop()
                     cmd = "ssh -n -f %s 'killall qperf'" % node
                     (out, errc) = commands.getstatusoutput(cmd)
                     cli_obj = self.builder.get_object("cli_%s" % node)
                     cli_obj.set_property('visible', True)
+                    log_e.set_status("DONE")
             else:
-                print "%s<%s" % (now,end)
-                all_cli.extend(cli_list)
+                all_cli.extend([x[0] for x in cli_list])
+        self.refresh_log()
         print "Still running:"
-        print "  srv: %s" % ", ".join(all_srv)
-        print "  cli: %s" % ", ".join(all_cli)
-                    
-                    
+        print "  srv: %s // cli: %s" % (", ".join(all_srv), ", ".join(all_cli))
+    def start_scenario(self, obj):
+        scenarios = [
+            {'cli':'emv107','srv':'emv104','dur':30,'test':'rc_bi_bw'},
+            {'cli':'emv106','srv':'emv111','dur':30,'test':'rc_bi_bw'},
+            {'cli':'emv109','srv':'emv108','dur':30,'test':'rc_bi_bw'},
             
-        
-                
+            {'cli':'emv105','srv':'emv106','dur':30,'test':'rc_rdma_read_bw'},
+            {'cli':'emv111','srv':'emv107','dur':30,'test':'rc_rdma_read_bw'},
+            
+            {'cli':'emv110','srv':'emv105','dur':30,'test':'rc_rdma_write_bw'},
+            {'cli':'emv104','srv':'emv110','dur':30,'test':'rc_rdma_write_bw'},
+            ]
+        for scen in scenarios:
+            cli = scen['cli']
+            cli_obj = self.builder.get_object("cli_%s" % cli)
+            cli_obj.set_active(True)
+            srv = scen['srv']
+            srv_obj = self.builder.get_object("srv_%s" % srv)
+            srv_obj.set_active(True)
+            dur = scen['dur']
+            dur_obj = self.builder.get_object("duration_min")
+            dur_obj.set_text(str(dur))
+            test = scen['test']
+            test_obj = self.builder.get_object(test)
+            test_obj.set_active(True)
+            
+            start_obj = self.builder.get_object('test_start')
+            start_obj.clicked()
+
 class MYparameter(Parameter):
     def extra(self):
         self.parser.add_option("-n",
