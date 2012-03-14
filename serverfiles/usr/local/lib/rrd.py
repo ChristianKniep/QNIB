@@ -203,13 +203,19 @@ class RRD(object):
         for plain_port in plain_ports:
             for plain_key in plain_keys:
                 val_keys.append("%s[%s]" % (plain_key, plain_port))
+        self.create_tab(typ,val_keys, td_vals_by_stamp)
+    def create_tab(self, typ, val_keys, td_vals_by_stamp):
         ## Table start
         if typ=='perf':
-            tab_typ = "Performance"
+            self.create_tab_perf(val_keys, td_vals_by_stamp)
         elif typ=='err':
             tab_typ = "Errorcounter"
         else:
             tab_typ = "Unkown typ"
+    def create_tab_perf(self, val_keys, td_vals_by_stamp):
+        rcv_keys = filter(lambda x: re.match("rcv", x), val_keys)
+        # rcv
+        tab_typ = "Rcv-Performance"
         self.html_code += """
         <table class="line" style="display:none;">
             <caption>%s %s</caption>
@@ -220,7 +226,7 @@ class RRD(object):
                 </tr>
             </thead>
             <tbody>""" % (tab_typ, self.node_name,
-                "</th>\n                   <th>".join(val_keys))
+                "</th>\n                   <th>".join(rcv_keys))
         stamps = td_vals_by_stamp.keys()
         stamps.sort()
         for stamp in stamps[:-1]:
