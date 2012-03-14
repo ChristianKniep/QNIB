@@ -196,4 +196,16 @@ CREATE TABLE traps (
     CONSTRAINT trap_pk
         PRIMARY KEY (trap_id)
 );
+-- GUI
+CREATE TABLE logs (
+    log_id SERIAL,
+    log_link_id integer,
+    log_node_id integer,
+    log_type varchar,
+    log_desc varchar(255),
+    log_status varchar(8),
+    log_time timestamp DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT log_pk
+        PRIMARY KEY (log_id)
+);
 

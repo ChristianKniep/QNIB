@@ -23,4 +23,5 @@ CREATE LANGUAGE plpgsql;
 \i init_tabs.sql;
 \i osmInCnt.sql;
 \i linkFunctions.sql
+\i locality.sql
 
