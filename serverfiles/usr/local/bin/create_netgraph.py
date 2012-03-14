@@ -82,6 +82,12 @@ def create(options,rDB, cfg, log):
     #cDB.bkpDat()
     #db.close("create_netgraph")
         
+def dump_log(rDB):
+    query = "SELECT * FROM logs"
+    res = rDB.sel(query)
+    for row in res:
+        print row
+        
 def gui(qnib,opt):
     from qnib_control import logC, log_entry
     logE = log_entry("Exec create_netgraph")
@@ -100,12 +106,13 @@ def main(argv=None):
     options = libTopology.Parameter(argv)
     options.check()
     
-    db = dbCon.dbCon(options)
+    rDB = dbCon.dbCon(options)
     
     cfg = config([options.cfgfile,],options)
     cfg.eval()
     log = libTopology.logC("/var/log/create_netgraph.log")
-    create(options,db, cfg, log)
+    create(options, rDB, cfg, log)
+    dump_log(rDB)
     
 if __name__ == "__main__":
     main()

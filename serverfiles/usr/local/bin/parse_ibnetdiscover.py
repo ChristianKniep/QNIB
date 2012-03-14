@@ -44,6 +44,7 @@ class Parameter(object):
         self.parser.add_option("-L", dest="lids", default=False, action="store", help="lid to debug (all other debug information will be supressed)")
         self.parser.add_option("--check-traps", dest="check_traps", default=False, action="store_true", help="check for traps stored in the DB inserted from opensm")
         self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
+        self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
         self.parser.add_option("--loop", dest="loop", default=False, action = "store_true", help = "Loop the script")
         self.parser.add_option("--delay", dest="loop_delay", default=10, action = "store", help = "Delay in seconds if loop is set (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
@@ -271,13 +272,13 @@ class checks(object):
         if acc: return True
         return False
     def matchSwitchPort(self,line,guid):
-        r = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\"\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
-        m = re.match(r,line)
-        if m:
+        reg = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\"\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+        mat = re.match(reg,line)
+        if mat:
             if guid and re.search(guid,line): print "Sw -> got it"
             # Port gefunden
             #(self.port,self.type,self.dguid,self.dport,self.dportguid,self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            self.swPorts.append(swPort(self.opt,self.switch,line,m))
+            self.swPorts.append(swPort(self.opt,self.switch,line,mat))
             return True
         return False
     def matchSwitchPortExt(self,line,guid):
@@ -449,10 +450,8 @@ class checks(object):
             n_state_new = self.stateNames['nok']
         self.db.setNodeState(n_state_new,prev_n_id,"Event?")
         return n_state_new
-        
     def eval_link_state(self):
         query = ""
-        
     def recursiv(self,node):
         kinder = [x.name for x,y in node.nLinks.items()]
         self.deb(node.getLids(),"Neue Rekursion von '%s' mit Kindern '%s'" % (node.name, ",".join(kinder)),'l',1)
