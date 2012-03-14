@@ -1538,7 +1538,7 @@ class cacheDB(object):
                 dst_name = dst_sName
             else:
                 dst_name = dst_nName
-            
+
             queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (n_id,name,nid,dst_name)
             self.__cur.execute(queryIns)
             if dst_type in ('switch'):
@@ -1563,8 +1563,8 @@ class cacheDB(object):
         except:
             print query
             raise IOError
-            
-        
+
+
         #  ge_id | ge_src_gnid | ge_src | ge_dst_gnid | ge_dst | ge_pos
         queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (src_gnId,src_gnName,dst_gnId,dst_gnName)
         self.__cur.execute(queryIns)
@@ -1643,11 +1643,20 @@ class cacheDB(object):
         res = self.sel(query)
         set_root = True
         for item in res:
-            (s_id,c_id,s_guid,s_name,cir_cnt,sw_cnt,extSw_cnt,comp_cnt) = item
+            (s_id, c_id, s_guid, s_name, cir_cnt,
+             sw_cnt, extSw_cnt, comp_cnt) = item
             if set_root:
                 query = """UPDATE nodes SET nt_id=
-                            (SELECT nt_id FROM nodetypes WHERE nt_name='root')
-                           WHERE s_id='%s'""" % s_id
+                            (SELECT nt_id FROM nodetypes
+                                    WHERE nt_name='root')"""
+                if self.opt.ibsim:
+                    # FIXME: A simple CLOS5 tricks my heuristic, because the spines
+                    #       are connected to more switches (2xSwitch,1xCore) then
+                    #       the core-Switch (only 2xSwitch) and there is _no_
+                    #       Circle within the network :)
+                    query += " WHERE n_name='core1'"
+                else:
+                    query += " WHERE s_id='%s'" % s_id
                 self.ins(query)
                 set_root = False
             query = "SELECT nt_name FROM nodes NATURAL JOIN nodetypes WHERE s_id='%s';" % s_id

@@ -45,6 +45,7 @@ class Parameter(object):
         self.parser.add_option("--check-traps", dest="check_traps", default=False, action="store_true", help="check for traps stored in the DB inserted from opensm")
         self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
         self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
+        self.parser.add_option("--ibsim", dest="ibsim", default=False, action = "store_true", help = "if we are running with ibsim, we have to PRELOAD libumad.so (default: %default)")
         self.parser.add_option("--loop", dest="loop", default=False, action = "store_true", help = "Loop the script")
         self.parser.add_option("--delay", dest="loop_delay", default=10, action = "store", help = "Delay in seconds if loop is set (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
@@ -89,7 +90,7 @@ class swPort(object):
         # Meine Switchports zuerst
         switch = self.switch
         src = switch.createPort(self.port,'',switch.lid)
-    
+
         pm = re.search("([a-z0-9]+)",self.dportguid,re.I)
         # TODO: Muss ich hier unterscheiden? Hoffe nicht.... :)
         if pm:
@@ -138,7 +139,7 @@ class checks(object):
         db.exe(query)
         self.statusList = []
         self.perfList = []
-        self.hostPat = "" #cfg.get('hostpat')
+        self.hostPat = cfg.get('hostpat')
         self.chassisNames = cfg.get('chassis')
         self.sysGuids = {}
         self.swPorts  = []
@@ -146,21 +147,24 @@ class checks(object):
     def evalSwPorts(self,cfg):
         for swP in self.swPorts:
             swP.eval(self.db,cfg)
+
     def ibnetdiscover(self):
-        db          = self.db
-        self.chassis     = {}
-        
-        if self.opt.file=="":
-            cmd = "sudo  LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so /usr/local/sbin/ibnetdiscover -g"
-            cmd = "sudo /usr/local/sbin/ibnetdiscover -g"
-            (ec,out) = commands.getstatusoutput(cmd)
-            if ec!=0:
-                self.statusList = [out+"ibnetdiscover failed"]
+        db = self.db
+        self.chassis = {}
+
+        if self.opt.file == "":
+            cmd = "sudo  "
+            if self.opt.ibsim:
+                cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so"
+            cmd += "/usr/local/sbin/ibnetdiscover -g"
+            (ec, out) = commands.getstatusoutput(cmd)
+            if ec != 0:
+                self.statusList = [out + "ibnetdiscover failed"]
                 self.retEC = 2
             lines = out.split("\n")
         else:
             ibfile = "/root/kniepch/IB_FlowAndCongestionControl/serverfiles/%s" % self.opt.file
-            fd = open(ibfile,"r")
+            fd = open(ibfile, "r")
             lines = fd.readlines()
             fd.close()
         bool = False
@@ -170,7 +174,7 @@ class checks(object):
         for line in lines:
             if self.matchContinue(line):
                 continue
-            
+
             ################################
             ## Spezielle Matches
             # hostports enthalten noch ihre portguid und srclid
@@ -184,7 +188,7 @@ class checks(object):
                     db.updatePort(nId,port,dport,slid,dlid,width,speed)
                     bool = False
                     continue
-            
+
             # Ich bin ein Chassismodul, da gibt es noch sowas wie [ext X]
             # [15][ext 15]    "S-0008f105002013b2"[32]                # "Voltaire 4036 # sw36" lid 419 4xDDR
             r = "^\[(\d+)\]\[ext (\d+)\].*\"[SH]-[0]*([a-z0-9]+)\"\[(\d+)\].*lid[ \t](\d+) (\d+)x([SDQ]DR)"
@@ -197,7 +201,7 @@ class checks(object):
                     continue
             # Chassismodul mit Knoten an anderer Seite
             # [14][ext 2]     "H-003048c1b2300000"[1](3048c1b2300001)                 # "harper132 HCA-1" lid 865 4xDDR
-            
+
             # Reset von allen Board-Spezifika
             r = "^vendid.*"
             m = re.match(r,line)
@@ -208,7 +212,7 @@ class checks(object):
                 chassisNr   = None
                 
             
-            
+
             if self.matchChassis(line): continue
             # sysimgguid (mit/ohne Chassis)
             if self.matchSystem(line): continue
@@ -223,7 +227,7 @@ class checks(object):
             if self.matchSwitch(line,True): continue
             # switchport
             if self.matchSwitchPortGen(line): continue
-            
+
         end = int(datetime.datetime.now().strftime("%s"))
         self.wall = end - self.start
         self.statusList.append("%s querys" % db.querys)
@@ -247,15 +251,15 @@ class checks(object):
         # [1](guid)
         r='^\[1\]\(.*'
         #if re.match(r,line): continue
-        
+
         # Leerzeilen
         r='^[ \t]+$'
         if re.match(r,line): return True
-        
+
         # vendid/devid/caguid
         r='^(vend|dev|cagu)id.*'
         if re.match(r,line): return True
-        
+
         # Auskommentiertes
         r='^#.*'
         if re.match(r,line): return True
@@ -405,6 +409,9 @@ class checks(object):
         while True:
             if len(res)>0:
                 row = res.pop()
+            else:
+                print query
+                sys.exit()
             (s_id, s_name, s_state_id, n_id, n_name, n_state_id, p_id, port, p_state_id) = row
             p_status = self.stateIds[p_state_id]
             n_status = self.stateIds[n_state_id]

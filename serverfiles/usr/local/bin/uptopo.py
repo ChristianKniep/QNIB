@@ -46,12 +46,13 @@ class graph(object):
         seenSys = []
         systemsNext = []
         switches = []
+        roots = []
         systems = self.cDB.getSystems()
         changedSids = []
         while True:
             if len(systems)==0: break
             system = systems.pop()
-            
+
             ## Wenn der Knoten ein Chassis-Knoten ist, dann...
             if system.isChassis():
                 # gehen erstmal alle Lampen an, stimmt das ueberhaupt noch?
@@ -70,33 +71,40 @@ class graph(object):
                     if delCandidate.c_id==chassis_sys.c_id:
                         systems.remove(delCandidate)
                         changedSids.extend(chassis_sys.drainSys(delCandidate))
-                        
+
                     else:
                         pass
                 switches.append(chassis_sys)
-            elif system.nt_name=="switch":
+            elif system.nt_name in ("root"):
+                roots.append(system)
+                self.deb("Appende Root: %s" % system,1)
+            elif system.nt_name in ("switch"):
                 switches.append(system)
                 self.deb("Appende Switch: %s" % system,1)
             else:
                 systemsNext.append(system)
-        
+
         while True:
-            if len(systemsNext)==0 and len(switches)==0: break
-            if len(switches)!=0:
+            if len(systemsNext)==0 and len(roots)==0 and len(switches)==0: break
+            if len(roots)!=0:
+                system = roots.pop()
+                self.deb("Poppe Root: %s" % system,2)
+            elif len(switches)!=0:
                 system = switches.pop()
                 self.deb("Poppe Switch: %s" % system,2)
             else:
                 system = systemsNext.pop()
             #system.alterEdgesSid(changedSids)
             if system.nt_name=='switch' and self.cDB.isEdgeSwitch(system.s_id):
-                self.deb("## Edge: %s | %s" % (system, str(self.cDB.isEdgeSwitch(system.s_id))),1)
+                self.deb("## Edge: %s | %s" % (system, str(self.cDB.isEdgeSwitch(system.s_id))), 1)
                 sg_id = self.cDB.addCluster(system.name)
                 gn_id = self.cDB.sys2SgNode(system,sg_id)
                 childs = self.cDB.getSysChilds(system.s_id)
                 for child in childs:
                     if child.s_id == system.s_id: continue
                     if not child.isSwitch(): 
-                        try: systemsNext.remove(child)
+                        try:
+                            systemsNext.remove(child)
                         except ValueError,e:
                             print """ Child '%s' nicht in Liste der systeme... Juckt mich das? """ % child
                             print "Ich glaube ja! ENDE!"
