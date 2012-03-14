@@ -183,7 +183,6 @@ class MyApp(object):
         cmd = ["/usr/bin/ssh", "-n", "-f", node, "/usr/bin/qperf"]
         sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
-        print cmd
         time.sleep(2)
         return sm_proc
     def start_client(self, cli, srv, test, delay, duration):
@@ -193,8 +192,6 @@ class MyApp(object):
         else:
             cmd = ["/usr/bin/ssh", "-n", "-f", cli,
                "/usr/bin/qperf", srv, "-t", "%ss" % duration, test]
-            
-        print cmd
         sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
         return sm_proc
