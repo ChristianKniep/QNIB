@@ -184,7 +184,7 @@ class parsePort(parseObj):
         self.p_ext   = 0
         self.lid   = 0
         self.n_id    = 0
-        self.rDB=False
+        self.rDB = db
     def setPNr(self,p_int):
         self.p_int   = p_int
         if self.p_ext==0:
@@ -207,22 +207,14 @@ class parsePort(parseObj):
         return res
 
 class edgeClass(object):
-    def __init__(self,opt,db,cfg,log):
+    def __init__(self,opt,rDB,cfg,log):
         self.cfg = cfg
         self.opt = opt
-        self.rDB  = db
+        self.rDB  = rDB
         self.log = log
     def setInfo(self,row):
         (self.src_gnid, self.src_name, self.dst_gnid, self.dst_name, pos) = row
-        #query = "SELECT lid FROM nodes NATURAL JOIN ports WHERE n_id='%s'" % (self.src_gnid)
-        #res = self.rDB.selOne(query)
-        #self.src_lid = res[0]
-        #query = "SELECT lid FROM nodes NATURAL JOIN ports WHERE n_id='%s'" % (self.dst_nid)
-        #res = self.rDB.selOne(query)
-        #self.dst_lid = res[0]
-        self.edgeOpts = {'pos':pos}
-    def setSysInfo(self,row):
-        (self.src_gnid, self.src_name, self.dst_gnid, self.dst_name, pos) = row
+        self.perfcache = self.rDB.getLinkPerf(self.src_name, self.dst_name)
         self.edgeOpts = {'pos':pos}
     def __str__(self):
         res = []
@@ -230,20 +222,45 @@ class edgeClass(object):
             if k in ('cfg','db','opt'): continue
             res.append("%s=%s" % (k,v))
         return "//".join(res)
-    def getEdgeStr(self,design):
+    def getEdgeStr(self,design,graph):
         self.opts = "["
         if not design:
-            self.getEdgeStrByGraph()
+            self.getEdgeStrByGraph(graph)
         self.opts += "]"
         if self.opts!="[]":
             return "\"%s\" -> \"%s\" %s;" % (self.src_name,self.dst_name,self.opts)
         else:
             return "\"%s\" -> \"%s\";" % (self.src_name,self.dst_name)
-    def getEdgeStrByGraph(self):
+    def getEdgeStrByGraph(self, graph):
         # Posisiton brauchen wir immer
         if self.edgeOpts['pos']!="" and self.edgeOpts['pos']!="None":
-            self.opts += "pos=%s " % self.edgeOpts['pos']
-        self.opts += 'arrowhead = \"none\" minlen = \"3\"'
+            self.opts += " pos=%s " % self.edgeOpts['pos']
+        if graph=="perf":
+            self.setPerfInfo()
+        elif graph=="plain":
+            self.setTopoInfo()
+        else:
+            self.opts += ' arrowhead=\"none\"'
+    def setTopoInfo(self):
+        self.opts += ' dir=\"none\"'
+        if self.perfcache['width']!=4:
+            self.opts += ' color=\"red\"'
+            query = ""
+    def setPerfInfo(self):
+        (xmit, rcv, max_perf) = (self.perfcache['xmit_data'],self.perfcache['rcv_data'], self.perfcache['max_data'])
+        xmit_rate = int(float(xmit)*1000/max_perf)
+        rcv_rate = int(float(rcv)*1000/max_perf)
+        if xmit_rate>0 and rcv_rate>0:
+            color = fancy_color(xmit_rate,rcv_rate)
+            self.opts += ' dir=\"both\", color=%s' % color
+        elif xmit_rate>0:
+            color = fancy_color1(xmit_rate)
+            self.opts += ' dir=\"forward\", color=%s' % color
+        elif rcv_rate>0:
+            color = fancy_color1(rcv_rate)
+            self.opts += ' dir=\"back\", color=%s' % color
+        else:
+            self.opts += ' dir=\"none\"'
     def setInTopo(self):
         query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' AND ge_dst_gnid='%s'" % (self.src_gnid,self.dst_gnid)
         self.rDB.ins(query)
@@ -532,28 +549,41 @@ class thePath(object):
         if self.opt.links and self.opt.debug>=deb:
             print msg
 
-def locality_color(val1,val2):
+def fancy_color1(val):
     color = {
-        0:"#0000ff",
-        1:"#1500e9",
-        2:"#2a00d4",
-        3:"#3f00bf",
-        4:"#5500aa",
-        5:"#6a0094",
-        6:"#7f007f",
-        7:"#94006a",
-        8:"#aa0055",
-        9:"#d4002a",
-        10:"#ff0000",
-            
+        0:"#8080ff",
+        1:"#ae80ff",
+        2:"#c580ff",
+        3:"#dc80ff",
+        4:"#f380ff",
+        5:"#ff80f3",
+        6:"#ff80dc",
+        7:"#ff80c5",
+        8:"#ff80ae",
+        9:"#ff8097",
+        10:"#ff8080", 
     }
-    return "\"%s:%s\"" % (color[(val1/10)],color[(val2/10)])
+    return "\"%s\"" % (color[(min(val,100)/10)])
+def fancy_color(val1, val2):
+    color = {
+        0:"#8080ff",
+        1:"#ae80ff",
+        2:"#c580ff",
+        3:"#dc80ff",
+        4:"#f380ff",
+        5:"#ff80f3",
+        6:"#ff80dc",
+        7:"#ff80c5",
+        8:"#ff80ae",
+        9:"#ff8097",
+        10:"#ff8080", 
+    }
+    return "\"%s:%s\"" % (color[(min(val1,100)/10)],color[(min(100,val2)/10)])
     
 class node(object):
     def __str__(self):
         res = "name:%-5s || %s" % (self.name,self.nodeOpts)
         return res
-        
     def setNodeInfo(self, rDB, row, graph='plain'):
         self.rDB = rDB
         (sg_id, c_id, s_id, n_id, \
@@ -575,7 +605,7 @@ class node(object):
         s_rev = res[0]
         if graph=='plain':
             self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id, c_id, s_id, s_rev, n_id)
-        self.nodeOpts['URL'] = "\"index.php?node_details=%s\"" % self.name
+        self.nodeOpts['URL'] = "\"index.php?map=root_perf&node_details=%s\"" % self.name
 
         if not self.nodeOpts['shape']:
             if self.nt_name=='switch':
@@ -595,14 +625,16 @@ class node(object):
                 self.nodeOpts['fontcolor']  = 'orange'
             else:
                 self.nodeOpts['fontcolor']  = 'red'
-        if graph=='perf':
+        if graph=='perf' and self.nt_name in ('switch', 'root'):
+            # FIXME: link performance is cDB, locality rDB -> inconsistent
             query = "SELECT * FROM getLocality('%s')" % gn_name
             res = rDB.selOne(query)
             if len(res)>=1:
+                (downRes, upRes, upIn, downOut, upOut, downIn) = res
                 (upin_downout, upout_downin) = res[:2]
                 locality = max(upin_downout, upout_downin)
                 self.nodeOpts['style']      = 'filled'
-                self.nodeOpts['fillcolor']  = locality_color(upin_downout, upout_downin)
+                self.nodeOpts['fillcolor']  = fancy_color(upin_downout, upout_downin)
                 self.nodeOpts['tooltip'] = "\"upIn/downOut:%s%% || upOut/downIn:%s%% \"" % (upin_downout, upout_downin)
     def getNodeOpts(self,design=False):
         opts = "["
@@ -887,6 +919,13 @@ class cacheDB(object):
                 pdat_time timestamp DEFAULT CURRENT_TIMESTAMP
             );"""
             )
+        self.__cur.execute("""CREATE TABLE perfcache (
+                pc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                p_id integer references ports(p_id) ON DELETE CASCADE,
+                pk_id integer references perfkeys(pk_id),
+                pc_val bigint
+            );"""
+            )
         self.__cur.execute("""CREATE TABLE perfhist (
                 p_id integer references ports(p_id) ON DELETE CASCADE,
                 pk_id integer references perfkeys(pk_id),
@@ -980,6 +1019,7 @@ class cacheDB(object):
                 'ports',
                 'perfkeys',
                 'perfdata',
+                'perfcache',
                 'links',
                 'circles',
                 'circles_x',
@@ -1010,6 +1050,20 @@ class cacheDB(object):
         for tab in tabs:
             self.bkpTab(tab)
         self.log.end("bkpDat")
+        self.sync()
+    def sync(self):
+        tabs = [
+            'nodes'
+        ]
+        for tab in tabs:
+            self.sync_tab(tab)
+    def sync_tab(self, tab):
+        query = "SELECT n_id, nt_id FROM %s" % tab
+        res = self.sel(query)
+        for row in res:
+            (n_id, nt_id) = row
+            upsert_query = "UPDATE nodes SET nt_id='%s' WHERE n_id='%s'" % (nt_id, n_id)
+            self.rDB.exe(upsert_query)
     def bkpTab(self,tab):
         query = "SELECT * FROM %s" % tab
         res = self.sel(query)
@@ -1584,11 +1638,18 @@ class cacheDB(object):
                             (SELECT SUM(comp_cnt) FROM nodes WHERE s_id=s.s_id) AS comp_cnt
                         FROM systems s
                         WHERE s_rev='0'
-                        ORDER BY cir_cnt DESC;"""
+                        ORDER BY cir_cnt, extSw_cnt DESC;"""
         systems = []
         res = self.sel(query)
+        set_root = True
         for item in res:
             (s_id,c_id,s_guid,s_name,cir_cnt,sw_cnt,extSw_cnt,comp_cnt) = item
+            if set_root:
+                query = """UPDATE nodes SET nt_id=
+                            (SELECT nt_id FROM nodetypes WHERE nt_name='root')
+                           WHERE s_id='%s'""" % s_id
+                self.ins(query)
+                set_root = False
             query = "SELECT nt_name FROM nodes NATURAL JOIN nodetypes WHERE s_id='%s';" % s_id
             try: nt_name = self.selOne(query)[0]
             except:
@@ -1642,6 +1703,28 @@ class cacheDB(object):
             query = """INSERT INTO sgn_options (sgn_id,sgno_key,sgno_val)
                         VALUES ('%s', '%s', '%s')""" % (gn_id,key,val)
             self.ins(query)
+    def getLinkPerf(self, src_name, dst_name):
+        # Get p_ids
+        query = """SELECT p1.p_id, l.width, l.speed
+                FROM links l, ports p1, nodes n1, ports p2, nodes n2
+                WHERE l.src=p1.p_id AND p1.n_id=n1.n_id AND n1.n_name='%s'
+                AND l.dst=p2.p_id AND p2.n_id=n2.n_id AND n2.n_name='%s'""" % \
+                (src_name,dst_name)
+        res = self.sel(query)
+        if len(res)!=1:
+            # FIXME: Multiple connections between nodes?!
+            raise IOError("Not sure if this works with multiple connections")
+        for row in res:
+            (src_pid, width, speed) = row
+        # xmit_traffic
+        query = """SELECT pk_id, pk_name, pc_val FROM perfcache
+                        NATURAL JOIN perfkeys WHERE p_id='%s'""" % src_pid
+        res = self.sel(query)
+        acc = {'max_data':int(int(speed)*int(width)), 'width':width, 'speed':speed}
+        for row in res:
+            (pk_id, pk_name, pc_val) = row
+            acc[pk_name] = pc_val
+        return acc
 
 class topology(object):
     def __init__(self,rDB,cDB,opt,cfg,log):
@@ -1899,8 +1982,8 @@ class topology(object):
             opt_dingens = opt.split("=")
             if len(opt_dingens)==2:
                 (k,v) = opt_dingens
-            elif len(opt_dingens)==3:
-                (k, v) = (opt_dingens[0], "%s=%s" % tuple(opt_dingens[1:]))
+            elif len(opt_dingens)>=3:
+                (k, v) = (opt_dingens[0], "=".join(tuple(opt_dingens[1:])))
             self.cDB.upsert_sgno(k, v, gn_id)
             
 class myTopo(topology):
@@ -2010,9 +2093,9 @@ class myTopo(topology):
             rowS.add(row)
         for row in rowS:
             edge = edgeClass(self.opt,self.cDB,self.cfg,self.log)
-            edge.setSysInfo(row)
+            edge.setInfo(row)
             # edge.evalLinks()
-            self.write(fd,edge.getEdgeStr(design))
+            self.write(fd,edge.getEdgeStr(design, self.graph))
             edge.setInTopo()
     def drawSGEdges(self,fd,sg_id,design):
         sg_query = "SELECT gn_id,gn_name FROM sg_nodes WHERE sg_id='%s'" % sg_id

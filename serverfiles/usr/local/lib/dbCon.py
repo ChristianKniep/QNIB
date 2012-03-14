@@ -87,6 +87,16 @@ class dbCon(object):
         res = self.sel(query)
         if len(res)==1: return res[0][0]
         raise IOError("No pid found")
+    def getSystems(self):
+        query = """SELECT   DISTINCT s.s_id,s.c_id,s.s_guid,s.s_name,n.nt_id,
+                            (SELECT SUM(cir_cnt) FROM nodes WHERE s_id=s.s_id) AS cir_cnt,
+                            (SELECT SUM(sw_cnt) FROM nodes WHERE s_id=s.s_id) AS sw_cnt,
+                            (SELECT SUM(extSw_cnt) FROM nodes WHERE s_id=s.s_id) AS extSw_cnt,
+                            (SELECT SUM(comp_cnt) FROM nodes WHERE s_id=s.s_id) AS comp_cnt
+                        FROM systems s NATURAL JOIN nodes n
+                        WHERE s_rev='0'
+                        ORDER BY cir_cnt, extSw_cnt DESC;"""
+        res = self.sel(query)
     def getRows(self,table,query,debug=3):
         try:
             self.querys += 1
@@ -106,21 +116,30 @@ class dbCon(object):
         query = "SELECT n_guid FROM nodes WHERE n_id='%s'" % n_id
         res = self.sel(query)
         return res[0][0]
-    def insLink(self,src,dst,width,speed):
-        query = "SELECT * FROM links WHERE (src='%s' AND dst='%s') OR (src='%s' AND dst='%s')" % (dst.p_id,src.p_id,src.p_id,dst.p_id)
+    def insLink(self, src, dst, width, speed):
+        query = """SELECT l_id, src, dst, width, speed, uplink, l_status, circle
+                    FROM links WHERE (src='%s' AND dst='%s')
+                               OR (src='%s' AND dst='%s')""" % \
+                    (dst.p_id,src.p_id,src.p_id,dst.p_id)
         res = self.sel(query)
+        if speed=="QDR":    speed="1000"
+        elif speed=="DDR":  speed="500"
+        elif speed=="SDR":  speed="250"
         if len(res)==0:
             self.countInsLink += 1
-            if speed=="QDR":    speed="1000"
-            elif speed=="DDR":  speed="500"
-            elif speed=="SDR":  speed="250"
             query = "INSERT INTO links (src,dst,width,speed) VALUES ('%s','%s','%s','%s')" % \
                     (src.p_id,dst.p_id,width,speed)
             self.exe(query)
             l_id = self.getIDWhere('links',"src='%s' AND dst='%s'" % (src.p_id,dst.p_id))
             return l_id         
         elif len(res)==1:
-            pass
+            (db_l_id, db_src, db_dst, db_width, db_speed, db_uplink, db_l_status, db_circle) = res[0]
+            if db_speed!=speed:
+                query = "UPDATE links SET speed='%s' WHERE l_id='%s'" % (speed, db_l_id)
+                self.update(query)
+            if db_width!=width:
+                query = "UPDATE links SET width='%s' WHERE l_id='%s'" % (width, db_l_id)
+                self.update(query)
         else:
             raise IOError("Multiple Eintraege der Rueckrichtung")
     def linkSetCircle(self,src,dst,cir_id=0):

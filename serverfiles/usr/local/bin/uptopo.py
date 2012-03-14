@@ -245,12 +245,16 @@ def eval_topo(options,db,cfg,log):
     else:
         cDB = libTopology.cacheDB(options, cfg, db, log)
     
+    rDB = dbCon.dbCon(options)
+    
     cDB.init()
     ## Los gehts
     G = graph(cDB,options)
     G.evalSystems()
+    
+    cDB.bkpDat()
 
-    topo = libTopology.myTopo(cDB,options,cfg,log)
+    topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
     topo.create(True)
     topo.fixPositions()
     
