@@ -81,6 +81,7 @@ class LOGentry(object):
     def __init__(self, desc):
         self.desc   = desc.strip()
         self.status = ""
+        self.time = time.time()
     def set_status(self, status):
         self.status = status.strip()
     def add_status(self, msg):
@@ -89,9 +90,11 @@ class LOGentry(object):
         self.desc += msg
     def set_desc(self, desc):
         self.desc = desc.strip()
+    def getTime(self):
+        return time.strftime("%H:%M", time.localtime(self.time))
     def __str__(self):
         if self.status != "":
-            res = "%s : %s" % (self.desc.ljust(60), self.status)
+            res = "%s# %s:%s" % (self.getTime(), self.desc.ljust(30), self.status)
         else:
             res = self.desc
         return res
@@ -105,8 +108,7 @@ class MyApp(object):
         self.builder.connect_signals(self)
         log_win = self.builder.get_object("log")
         self.log_buffer = log_win.get_buffer()
-        arr = []
-        arr.extend([""]*9)
+        arr = [""]*15
         self.log_buffer.set_text("\n".join(arr))
         font_desc = pango.FontDescription('Courier 10')
         log_win.modify_font(font_desc)
@@ -121,7 +123,7 @@ class MyApp(object):
         self.cli_proc = {}
         self.ignore_but = False
         log_e = LOGentry("")
-        self.log_text = [log_e]*10
+        self.log_text = [log_e]*15
         dst_obj = self.builder.get_object("src_emv111")
     def start_qperf(self, obj):
         test_read_obj = self.builder.get_object("rc_rdma_read_bw")
@@ -139,7 +141,11 @@ class MyApp(object):
         dur_obj = self.builder.get_object("duration_min")
         dur_min = int(dur_obj.get_text())
         dur_sec = 60*dur_min
-        log_e = LOGentry("Starting %smin qperf pair" % dur_min)
+        delay_obj = self.builder.get_object("delay_min")
+        delay_min = int(delay_obj.get_text())
+        delay_sec = 60*delay_min
+        
+        log_e = LOGentry("%smin(delay:%s)" % (dur_min, delay_min))
         self.add_log(log_e)
         stamp = int(time.time())
         stamp_end = int(dur_sec)+stamp+15
@@ -151,14 +157,14 @@ class MyApp(object):
         self.srv_free -= set([srv])
         self.servers  |= set([srv])
         
-        self.start_server(srv)
+        srv_subp = self.start_server(srv)
         if stamp_end not in self.srv_proc.keys():
             self.srv_proc[stamp_end] = []
-        self.srv_proc[stamp_end].append((srv, log_e))
+        self.srv_proc[stamp_end].append((srv, log_e, srv_subp))
         
         # Start Client
         cli = self.next_cli
-        log_stat= "%s%s%s" % (cli,dir,srv)
+        log_stat= ", %s%s%s" % (cli,dir,srv)
         log_e.add_desc(log_stat)
         self.refresh_log()
         cli_obj = self.builder.get_object("cli_%s" % cli)
@@ -168,22 +174,30 @@ class MyApp(object):
         
         if stamp_end not in self.cli_proc.keys():
             self.cli_proc[stamp_end] = []
-        self.start_client(cli, srv, test, dur_sec)
-        self.cli_proc[stamp_end].append((cli, log_e))
+        cli_subp = self.start_client(cli, srv, test, delay_sec, dur_sec)
+        self.cli_proc[stamp_end].append((cli, log_e, cli_subp))
         
         log_e.set_status("ONGOING")
         self.refresh_log()
     def start_server(self, node):
         cmd = ["/usr/bin/ssh", "-n", "-f", node, "/usr/bin/qperf"]
+        sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
+        print cmd
+        time.sleep(2)
+        return sm_proc
+    def start_client(self, cli, srv, test, delay, duration):
+        if delay>0:
+            cmd = ["/usr/bin/ssh", "-n", "-f", cli, "sleep", str(delay),";",
+               "/usr/bin/qperf", srv, "-t", "%ss" % duration, test]
+        else:
+            cmd = ["/usr/bin/ssh", "-n", "-f", cli,
+               "/usr/bin/qperf", srv, "-t", "%ss" % duration, test]
+            
         print cmd
         sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)
-        time.sleep(1)
-    def start_client(self, cli, srv, test, duration):
-        cmd = ["/usr/bin/ssh", "-n", "-f", cli, "/usr/bin/qperf", srv, "-t", "%ss" % duration, test]
-        print cmd
-        sm_proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE)
+        return sm_proc
     def eval_objects(self):
         objs = self.builder.get_objects()
         if len(self.servers)==0 and len(self.srv_free)==0:
@@ -247,7 +261,7 @@ class MyApp(object):
         self.log_text.append(log_e)
         self.refresh_log()
     def refresh_log(self):
-        log_list = [x.__str__() for x in self.log_text[-10:]]
+        log_list = [x.__str__() for x in self.log_text[-15:]]
         log_list.reverse()
         self.log_buffer.set_text("\n".join(log_list))
     def change_window(self, obj):
@@ -259,7 +273,7 @@ class MyApp(object):
         """ Change color of the textbox"""
         #obj.modify_base(gtk.STATE_NORMAL,gtk.gdk.color_parse('#000000'))
         #obj.modify_text(gtk.STATE_NORMAL,gtk.gdk.color_parse('#FFFFFF'))
-        obj.modify_font(pango.FontDescription('Monospace 10'))
+        obj.modify_font(pango.FontDescription('Monospace 6'))
     def change_button(self,opt):
         cmap = opt.get_colormap()
         color_normal = cmap.alloc_color("darkgrey")
@@ -283,11 +297,12 @@ class MyApp(object):
         all_srv = []
         now = int(time.time())
         for end, srv_list in self.srv_proc.items():
-            if now>end:
+            if end<now:
                 while len(srv_list)>0:
-                    (node,log_e) = srv_list.pop()
-                    cmd = "ssh -n -f %s 'killall qperf'" % node
+                    (node,log_e, proc) = srv_list.pop()
+                    cmd = "ssh -n -f %s 'pkill -f qperf$'" % node
                     (out, errc) = commands.getstatusoutput(cmd)
+                    out, err = proc.communicate()
                     srv_obj = self.builder.get_object("srv_%s" % node)
                     srv_obj.set_property('visible', True)
                     log_e.set_status("DONE")
@@ -295,41 +310,50 @@ class MyApp(object):
                 all_srv.extend([x[0] for x in srv_list])
                 
         for end, cli_list in self.cli_proc.items():
-            if now>end:
+            reg_mb = "(\d+)[ \t]+MB"
+            reg_gb = "(\d+)\.(\d+)[ \t]+GB"
+            if end<now:
                 while len(cli_list)>0:
-                    (node, log_e) = cli_list.pop()
-                    cmd = "ssh -n -f %s 'killall qperf'" % node
-                    (out, errc) = commands.getstatusoutput(cmd)
+                    (node, log_e, proc) = cli_list.pop()
+                    out,err = proc.communicate()
+                    perf = ""
+                    for line in out.split("\n"):
+                        mat_mb = re.search(reg_mb, line)
+                        mat_gb = re.search(reg_gb, line)
+                        if mat_mb:
+                            perf = "%sMB/s" % mat_mb.group(1)
+                        elif mat_gb:
+                            perf = "%s.%sGB/s" % mat_gb.groups()
+                    if perf!="":
+                        log_e.set_status(perf)
+                    else:
+                        log_e.set_status("NO PERF")
+                        
                     cli_obj = self.builder.get_object("cli_%s" % node)
                     cli_obj.set_property('visible', True)
-                    log_e.set_status("DONE")
             else:
                 all_cli.extend([x[0] for x in cli_list])
         self.refresh_log()
-        print "Still running:"
-        print "  srv: %s // cli: %s" % (", ".join(all_srv), ", ".join(all_cli))
+        #print "Still running:"
+        #print "  srv: %s // cli: %s" % (", ".join(all_srv), ", ".join(all_cli))
     def start_scenario(self, obj):
-        mat = re.search("(\d+)(d|m)",obj.get_name())
+        mat = re.search("(\d+)",obj.get_name())
         if mat:
-            (dec, unit) = mat.groups()
-            if unit=="m":
-                set_dur = int(dec)
-            elif unit == "d":
-                set_dur = int(dec)*24*60*60
+            scen_id = mat.groups()[0]
         else:
             raise IOError
-        scenarios = [
-            {'cli':'emv107','srv':'emv104','dur':set_dur,'test':'rc_bi_bw'},
-            {'cli':'emv106','srv':'emv111','dur':set_dur,'test':'rc_bi_bw'},
-            
-            {'cli':'emv109','srv':'emv108','dur':set_dur,'test':'rc_rdma_read_bw'},
-            {'cli':'emv105','srv':'emv106','dur':set_dur,'test':'rc_rdma_read_bw'},
-            {'cli':'emv111','srv':'emv107','dur':set_dur,'test':'rc_rdma_read_bw'},
-            
-            {'cli':'emv110','srv':'emv105','dur':set_dur,'test':'rc_rdma_write_bw'},
-            {'cli':'emv104','srv':'emv110','dur':set_dur,'test':'rc_rdma_write_bw'},
-            
-            ]
+        if scen_id=="1":
+            scenarios = [
+                {'cli':'emv107','srv':'emv104','delay':0, 'dur':11,'test':'rc_bi_bw'},
+                {'cli':'emv106','srv':'emv111','delay':2, 'dur':18,'test':'rc_bi_bw'},
+                
+                {'cli':'emv109','srv':'emv108','delay':0, 'dur':20,'test':'rc_rdma_read_bw'},
+                {'cli':'emv105','srv':'emv106','delay':0, 'dur':18,'test':'rc_rdma_read_bw'},
+                {'cli':'emv111','srv':'emv107','delay':2, 'dur':18,'test':'rc_rdma_read_bw'},
+                
+                {'cli':'emv110','srv':'emv105','delay':1, 'dur':18,'test':'rc_rdma_write_bw'},
+                {'cli':'emv104','srv':'emv110','delay':2, 'dur':17,'test':'rc_rdma_write_bw'},
+                ]
         for scen in scenarios:
             cli = scen['cli']
             cli_obj = self.builder.get_object("cli_%s" % cli)
@@ -340,6 +364,9 @@ class MyApp(object):
             dur = scen['dur']
             dur_obj = self.builder.get_object("duration_min")
             dur_obj.set_text(str(dur))
+            delay = scen['delay']
+            delay_obj = self.builder.get_object("delay_min")
+            delay_obj.set_text(str(delay))
             test = scen['test']
             test_obj = self.builder.get_object(test)
             test_obj.set_active(True)
