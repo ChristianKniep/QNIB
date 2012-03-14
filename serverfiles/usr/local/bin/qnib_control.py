@@ -102,7 +102,8 @@ class MyApp(object):
         self.builder.connect_signals(self)
         log_win = self.builder.get_object("log")
         self.log_buffer = log_win.get_buffer()
-        self.log_buffer.set_text("starting")
+        arr = [""]*10
+        self.log_buffer.set_text("\n".join(arr))
         font_desc = pango.FontDescription('Courier 10')
         log_win.modify_font(font_desc)
 
