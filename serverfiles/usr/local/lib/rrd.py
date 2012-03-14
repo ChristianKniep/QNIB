@@ -213,8 +213,45 @@ class RRD(object):
         else:
             tab_typ = "Unkown typ"
     def create_tab_perf(self, val_keys, td_vals_by_stamp):
-        rcv_keys = filter(lambda x: re.match("rcv", x), val_keys)
+        # xmit
+        xmit_keys = filter(lambda x: re.match("xmit", x), val_keys)
+        xmit_keys.sort()
+        tab_typ = "Xmit-Performance"
+        self.html_code += """
+        <table class="line" style="display:none;">
+            <caption>%s %s</caption>
+            <thead>
+                <tr>
+                  <td></td>
+                  <th>%s</th>
+                </tr>
+            </thead>
+            <tbody>""" % (tab_typ, self.node_name,
+                "</th>\n                   <th>".join(xmit_keys))
+        stamps = td_vals_by_stamp.keys()
+        stamps.sort()
+        for stamp in stamps[:-1]:
+            #for stamp, vals in td_vals_by_stamp.items():
+            vals = td_vals_by_stamp[stamp]
+            rrd_vals = []
+            for xmit_key in xmit_keys:
+                rrd_vals.append(vals[xmit_key])
+            #rrd_vals = [x for x in vals.values() if x!=None]
+            self.html_code += """
+            <tr>
+                <th>%s</th>
+                """ % time.strftime("%H:%M", time.localtime(int(stamp)))
+            self.html_code += """<td>%s</td>
+            </tr>
+            """ % "</td>\n                <td>".join(rrd_vals)
+
+        self.html_code += """
+            </tbody>
+        </table>
+        """
         # rcv
+        rcv_keys = filter(lambda x: re.match("rcv", x), val_keys)
+        rcv_keys.sort()
         tab_typ = "Rcv-Performance"
         self.html_code += """
         <table class="line" style="display:none;">
@@ -232,7 +269,10 @@ class RRD(object):
         for stamp in stamps[:-1]:
             #for stamp, vals in td_vals_by_stamp.items():
             vals = td_vals_by_stamp[stamp]
-            rrd_vals = [x for x in vals.values() if x!=None]
+            rrd_vals = []
+            for rcv_key in rcv_keys:
+                rrd_vals.append(vals[rcv_key])
+            #rrd_vals = [x for x in vals.values() if x!=None]
             self.html_code += """
             <tr>
                 <th>%s</th>
