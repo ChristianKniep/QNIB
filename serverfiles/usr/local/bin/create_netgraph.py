@@ -109,6 +109,9 @@ def main(argv=None):
     rDB = dbCon.dbCon(options)
     
     while True:
+        if os.path.exists('/tmp/parse_ibnetdiscover.lock'):
+            time.sleep(1)
+            continue
         cfg = config([options.cfgfile,],options)
         cfg.eval()
         log = libTopology.logC("/var/log/create_netgraph.log")

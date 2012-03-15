@@ -582,6 +582,7 @@ def gui(qnib,opt):
 def main():
     # Parameter
     while True:
+        open('/tmp/parse_ibnetdiscover.lock', 'w').close() 
         options = Parameter()
         options.check()
         cfg = libTopology.config([options.cfgfile,],options)
@@ -612,6 +613,7 @@ def main():
         # If we are not suppose to loop the script, we break
         if not options.loop:
             break
+        os.remove('/tmp/parse_ibnetdiscover.lock')
         time.sleep(int(options.loop_delay))
     ec=chk.getEC()
     sys.exit(ec)
