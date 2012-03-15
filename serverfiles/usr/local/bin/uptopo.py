@@ -106,10 +106,10 @@ class graph(object):
                         try:
                             systemsNext.remove(child)
                         except ValueError,e:
-                            print """ Child '%s' nicht in Liste der systeme... Juckt mich das? """ % child
+                            print """ Child '%s' von System '%s' nicht in Liste der systeme... Juckt mich das? """ % (child.name,system.name)
                             print "Ich glaube ja! ENDE!"
                             sys.exit()
-                        self.deb("""## Switch hat Child: %s""" % child,1)
+                        self.deb("""## Switch '%s' hat Child: %s""" % (system.name, child.name),1)
                         gn_id = self.cDB.sys2SgNode(child,sg_id)
                     elif not self.cDB.isEdgeSwitch(child.s_id):
                         # Ja, was machen wir da?

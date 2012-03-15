@@ -155,7 +155,7 @@ class checks(object):
         if self.opt.file == "":
             cmd = "sudo  "
             if self.opt.ibsim:
-                cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so"
+                cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so "
             cmd += "/usr/local/sbin/ibnetdiscover -g"
             (ec, out) = commands.getstatusoutput(cmd)
             if ec != 0:

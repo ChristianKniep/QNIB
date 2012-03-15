@@ -354,10 +354,10 @@ class parseNode(parseObj):
         self.setType('switch')
     def setHost(self):
         self.setType('host')
-    def isType(self,typ):
-        return self.type==typ
+    def isType(self,types):
+        return self.type in types
     def isSwitch(self):
-        return self.isType('switch')
+        return self.isType(['switch', 'root'])
     def getIntSwLink(self,path=[]):
         freshLinks = [x for x in self.links.values() if (x.isInterswitch() and not x.seen and x not in path)]
         try:
@@ -1641,7 +1641,7 @@ class cacheDB(object):
                         ORDER BY cir_cnt, extSw_cnt DESC;"""
         systems = []
         res = self.sel(query)
-        set_root = True
+        set_root = False
         for item in res:
             (s_id, c_id, s_guid, s_name, cir_cnt,
              sw_cnt, extSw_cnt, comp_cnt) = item
