@@ -26,7 +26,7 @@ start()
     [ -f /var/lock/subsys/opensm ] && return 0
     # Start opensm
     echo -n "Starting IB Subnet Manager:"
-    $prog -B > /dev/null 2>&1
+    $prog -F /etc/opensm.conf > /dev/null 2>&1
     sleep 1
     OSM_PID=`pidof $prog`
     checkpid $OSM_PID
