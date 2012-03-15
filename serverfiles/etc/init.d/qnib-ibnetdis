@@ -12,7 +12,7 @@ case "$1" in
         #To run it as root:
         /root/QNIB/serverfiles/usr/local/bin/parse_ibnetdiscover.py \
             --ibsim --force-uptopo \
-            --graphviz-cmd=twopi --loop --delay 15 &
+            --graphviz-cmd=twopi --loop &
         echo "."
         ;;
   stop)

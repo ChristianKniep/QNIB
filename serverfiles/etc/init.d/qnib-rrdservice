@@ -9,9 +9,9 @@ case "$1" in
         echo -n "Starting qnib-rrdservice"
         #To run it as root:
         /root/QNIB/serverfiles/usr/local/bin/rrd_update.py \
-            --loop --delay 11 &
+            --loop &
         /root/QNIB/serverfiles/usr/local/bin/rrd_graph.py \
-            --loop --delay 11 &
+            --loop &
         echo "."
         ;;
   stop)
