@@ -8,7 +8,7 @@
 
 case "$1" in
   start)
-        echo -n "Starting ibnetdiscover-script"
+        echo -n "Starting qnib-ibnetdis"
         #To run it as root:
         /root/QNIB/serverfiles/usr/local/bin/parse_ibnetdiscover.py \
             --ibsim --force-uptopo \
@@ -16,14 +16,14 @@ case "$1" in
         echo "."
         ;;
   stop)
-        echo -n "Stopping new-service"
+        echo -n "Stopping qnib-ibnetdis"
         #To run it as root:
         killall /root/QNIB/serverfiles/usr/local/bin/parse_ibnetdiscover.py
         echo "."
         ;;
 
   *)
-        echo "Usage: /sbin/service qnib-ibnetdis {start|stop}"
+        echo "Usage: /sbin/service qnib-ibnetdis" {start|stop}"
         exit 1
 esac
 

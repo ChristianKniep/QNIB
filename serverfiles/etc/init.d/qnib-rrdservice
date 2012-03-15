@@ -6,7 +6,7 @@
 
 case "$1" in
   start)
-        echo -n "Starting ibnetdiscover-script"
+        echo -n "Starting qnib-rrdservice"
         #To run it as root:
         /root/QNIB/serverfiles/usr/local/bin/rrd_update.py \
             --loop --delay 11 &
@@ -15,7 +15,7 @@ case "$1" in
         echo "."
         ;;
   stop)
-        echo -n "Stopping new-service"
+        echo -n "Stopping qnib-rrdservic"
         #To run it as root:
         /usr/bin/pkill -f 'python /root/QNIB/serverfiles/usr/local/bin/rrd_update.py'
         /usr/bin/pkill -f 'python /root/QNIB/serverfiles/usr/local/bin/rrd_graph.py'
@@ -23,7 +23,7 @@ case "$1" in
         ;;
 
   *)
-        echo "Usage: /sbin/service qnib-rrdservice {start|stop}"
+        echo "Usage: /sbin/service qnib-rrdservic {start|stop}"
         exit 1
 esac
 
