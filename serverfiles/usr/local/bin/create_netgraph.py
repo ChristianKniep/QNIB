@@ -108,11 +108,22 @@ def main(argv=None):
     
     rDB = dbCon.dbCon(options)
     
-    cfg = config([options.cfgfile,],options)
-    cfg.eval()
-    log = libTopology.logC("/var/log/create_netgraph.log")
-    create(options, rDB, cfg, log)
-    dump_log(rDB)
+    while True:
+        cfg = config([options.cfgfile,],options)
+        cfg.eval()
+        log = libTopology.logC("/var/log/create_netgraph.log")
+        try: create(options, rDB, cfg, log)
+        except IOError, e:
+            print "Creation failed, I guess it overlaps with parse_ibnetdiscover"
+            print e
+            time.sleep(2)
+            continue
+        else:
+            dump_log(rDB)
+        
+        if not options.loop:
+            break
+        time.sleep(int(options.loop_delay))
     
 if __name__ == "__main__":
     main()

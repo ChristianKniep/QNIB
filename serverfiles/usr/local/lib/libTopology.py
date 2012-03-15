@@ -1886,7 +1886,10 @@ class topology(object):
         fd.write("%s%s\n" % ("\t"*self.tab,line))
     def fixPositions(self):
         self.log.start("fixPos")
-        cmd = "/usr/bin/sfdp -Tdot %s" % self.rFb
+	if self.opt.graphviz_cmd!="":
+            cmd = "%s -Tdot %s" % (self.opt.graphviz_cmd, self.rFb)
+	else:
+            cmd = "/usr/bin/sfpd -Tdot %s" % self.rFb
         (ec,out) = commands.getstatusoutput(cmd)
         if ec!=0:
             print out
@@ -2178,6 +2181,11 @@ class Parameter(object):
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
         self.parser.add_option("--db",dest="db",default=False, action = "store_true", help = "Show database debug information")
         self.parser.add_option("--dot",dest="dot",default=False, action = "store_true", help = "Show graphviz debug information")
+        self.parser.add_option("--loop", dest="loop", default=False,
+            action = "store_true", help = "Loop the script")
+        self.parser.add_option("--delay", dest="loop_delay", default=11,
+            action = "store",
+            help = "Delay in seconds if loop is set (default: %default)")
     def check(self):
         pass
 

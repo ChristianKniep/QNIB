@@ -1,0 +1,30 @@
+#! /bin/sh
+###
+# chkconfig: 235 99 99
+# description: Starts rrd_update and rrd_graph within a loop
+###
+
+case "$1" in
+  start)
+        echo -n "Starting ibnetdiscover-script"
+        #To run it as root:
+        /root/QNIB/serverfiles/usr/local/bin/rrd_update.py \
+            --loop --delay 11 &
+        /root/QNIB/serverfiles/usr/local/bin/rrd_graph.py \
+            --loop --delay 11 &
+        echo "."
+        ;;
+  stop)
+        echo -n "Stopping new-service"
+        #To run it as root:
+        /usr/bin/pkill -f 'python /root/QNIB/serverfiles/usr/local/bin/rrd_update.py'
+        /usr/bin/pkill -f 'python /root/QNIB/serverfiles/usr/local/bin/rrd_graph.py'
+        echo "."
+        ;;
+
+  *)
+        echo "Usage: /sbin/service qnib-rrdservice {start|stop}"
+        exit 1
+esac
+
+exit 0

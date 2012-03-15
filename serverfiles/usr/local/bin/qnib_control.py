@@ -107,7 +107,7 @@ class MyApp(object):
         font_desc = pango.FontDescription('Courier 10')
         log_win.modify_font(font_desc)
 
-        self.ibs = libibsim.IBsim("/root/QNIB/serverfiles/test/netlist.clos5")
+        self.ibs = libibsim.IBsim("/root/QNIB/serverfiles/test/netlist.clos5", "/usr/bin/ibsim")
 
         log_e = LOGentry("")
         self.log_text = [log_e]*10

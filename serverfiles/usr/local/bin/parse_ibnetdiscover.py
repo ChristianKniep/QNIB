@@ -45,6 +45,7 @@ class Parameter(object):
         self.parser.add_option("--check-traps", dest="check_traps", default=False, action="store_true", help="check for traps stored in the DB inserted from opensm")
         self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
         self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
+        self.parser.add_option("--graphviz-cmd", dest="graphviz_cmd", default="sfdp", action = "store", help = "Graphviz cmd to layout graph (default: %default)")
         self.parser.add_option("--ibsim", dest="ibsim", default=False, action = "store_true", help = "if we are running with ibsim, we have to PRELOAD libumad.so (default: %default)")
         self.parser.add_option("--loop", dest="loop", default=False, action = "store_true", help = "Loop the script")
         self.parser.add_option("--delay", dest="loop_delay", default=10, action = "store", help = "Delay in seconds if loop is set (default: %default)")
@@ -155,7 +156,8 @@ class checks(object):
         if self.opt.file == "":
             cmd = "sudo  "
             if self.opt.ibsim:
-                cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so "
+                cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so"
+		cmd += ":/usr/lib64/umad2sim/libumad2sim.so "
             cmd += "/usr/local/sbin/ibnetdiscover -g"
             (ec, out) = commands.getstatusoutput(cmd)
             if ec != 0:
@@ -411,6 +413,7 @@ class checks(object):
                 row = res.pop()
             else:
                 print query
+		print "DB emtpy! srsly?"
                 sys.exit()
             (s_id, s_name, s_state_id, n_id, n_name, n_state_id, p_id, port, p_state_id) = row
             p_status = self.stateIds[p_state_id]
@@ -590,7 +593,7 @@ def main():
         (trap_dict, trap_list) = db.getTraps()
         chk = checks(db, options, cfg, log)
         if len(trap_dict)>0 or options.force_uptopo:
-            log.debug("%s Traps detected..." % len(trap_dict),0)
+            log.debug("%s Traps detected..." % len(trap_dict),1)
             chk.ibnetdiscover()
             chk.evalSwPorts(cfg)
             chk.evalHistory()
@@ -601,7 +604,7 @@ def main():
             # -> User removed a node for good
             chk.update_topo()
         else:
-            log.debug("%s Traps detected..." % len(trap_dict),0)
+            log.debug("%s Traps detected..." % len(trap_dict),1)
             
         # we sure should redraw the graph to visualize the traffic
         chk.create_graphs()
@@ -609,7 +612,6 @@ def main():
         # If we are not suppose to loop the script, we break
         if not options.loop:
             break
-        del db
         time.sleep(int(options.loop_delay))
     ec=chk.getEC()
     sys.exit(ec)
