@@ -23,7 +23,7 @@ case "$1" in
         ;;
 
   *)
-        echo "Usage: /sbin/service qnib-ibnetdis" {start|stop}"
+        echo "Usage: /sbin/service qnib-ibnetdis {start|stop}"
         exit 1
 esac
 
