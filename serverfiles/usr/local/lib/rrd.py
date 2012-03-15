@@ -128,6 +128,7 @@ class RRD(object):
         process.communicate()
     
     def html5(self, mins,s_time='now'):
+        self.mins = mins
         self.html_code = """<!DOCTYPE HTML>
 <html>
     <head>
@@ -230,17 +231,30 @@ class RRD(object):
                 "</th>\n                   <th>".join(xmit_keys))
         stamps = td_vals_by_stamp.keys()
         stamps.sort()
-        for stamp in stamps[:-1]:
+        modulo = int(self.mins/4)
+        counter = 0
+        pop_stamps = [x for x in stamps[:-1]]
+        pop_stamps.reverse()
+        while len(pop_stamps)>0:
+            stamp = pop_stamps.pop()
             #for stamp, vals in td_vals_by_stamp.items():
             vals = td_vals_by_stamp[stamp]
             rrd_vals = []
             for xmit_key in xmit_keys:
                 rrd_vals.append(vals[xmit_key])
             #rrd_vals = [x for x in vals.values() if x!=None]
-            self.html_code += """
+            if counter%modulo==0:
+                self.html_code += """
             <tr>
                 <th>%s</th>
                 """ % time.strftime("%H:%M", time.localtime(int(stamp)))
+                counter=1
+            else:
+                self.html_code += """
+            <tr>
+                <th></th>"""
+                counter += 1
+                
             self.html_code += """<td>%s</td>
             </tr>
             """ % "</td>\n                <td>".join(rrd_vals)
@@ -266,17 +280,29 @@ class RRD(object):
                 "</th>\n                   <th>".join(rcv_keys))
         stamps = td_vals_by_stamp.keys()
         stamps.sort()
-        for stamp in stamps[:-1]:
+        modulo = int(self.mins/4)
+        counter = 0
+        pop_stamps = [x for x in stamps[:-1]]
+        pop_stamps.reverse()
+        while len(pop_stamps)>0:
+            stamp = pop_stamps.pop()
             #for stamp, vals in td_vals_by_stamp.items():
             vals = td_vals_by_stamp[stamp]
             rrd_vals = []
             for rcv_key in rcv_keys:
                 rrd_vals.append(vals[rcv_key])
-            #rrd_vals = [x for x in vals.values() if x!=None]
-            self.html_code += """
+            if counter%modulo==0:
+                self.html_code += """
             <tr>
                 <th>%s</th>
                 """ % time.strftime("%H:%M", time.localtime(int(stamp)))
+                counter=1
+            else:
+                self.html_code += """
+            <tr>
+                <th></th>"""
+                counter += 1
+            
             self.html_code += """<td>%s</td>
             </tr>
             """ % "</td>\n                <td>".join(rrd_vals)
