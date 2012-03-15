@@ -22,7 +22,7 @@ import datetime
 
 class IBsim(object):
     """ lib-Class to control ibsimulation"""
-    def __init__(self, topo_file, binary="/usr/bin/ibsim"):
+    def __init__(self, topo_file, binary):
         self.topo_file  = topo_file
         self.bin        = binary
         self.log_file   = "/var/log/ibsom.log"
@@ -34,7 +34,7 @@ class IBsim(object):
         file_d.close()
     def service_ibsim(self, log_e, start=True):
         if start:
-            command = [self.bin, "-c", "1000", "-s", self.topo_file]
+            command = [self.bin, "-s", self.topo_file]
             self.ibs_proc = subprocess.Popen(command, shell=False, stderr=None,
                                              stdout=subprocess.PIPE,
                                              stdin=subprocess.PIPE)
