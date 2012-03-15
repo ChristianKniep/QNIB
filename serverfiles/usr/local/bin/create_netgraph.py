@@ -111,10 +111,15 @@ def main(argv=None):
     while True:
         if os.path.exists('/tmp/parse_ibnetdiscover.lock'):
             time.sleep(1)
+            print "Lockfile exists"
             continue
         cfg = config([options.cfgfile,],options)
         cfg.eval()
         log = libTopology.logC("/var/log/create_netgraph.log")
+        if os.path.exists('/tmp/parse_ibnetdiscover.lock'):
+            time.sleep(1)
+            print "Lockfile exists"
+            continue
         try: create(options, rDB, cfg, log)
         except IOError, e:
             print "Creation failed, I guess it overlaps with parse_ibnetdiscover"
