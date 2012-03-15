@@ -1,0 +1,137 @@
+#!/bin/bash
+#
+# Bring up/down opensm
+#
+# chkconfig: - 15 85
+# description: Activates/Deactivates InfiniBand Subnet Manager
+# config: /etc/ofed/opensm.conf
+#
+### BEGIN INIT INFO
+# Provides:       opensm
+# Default-Stop: 0 1 2 3 4 5 6
+# Required-Start: $openib
+# Short-Description: Starts/Stops the InfiniBand Subnet Manager
+# Description: Starts/Stops the InfiniBand Subnet Manager
+### END INIT INFO
+
+. /etc/rc.d/init.d/functions
+
+prog=/usr/local/sbin/opensm
+PID_FILE=/var/run/opensm.pid
+ACTION=$1
+
+start()
+{
+    local OSM_PID=
+    [ -f /var/lock/subsys/opensm ] && return 0
+    # Start opensm
+    echo -n "Starting IB Subnet Manager:"
+    $prog -B > /dev/null 2>&1
+    sleep 1
+    OSM_PID=`pidof $prog`
+    checkpid $OSM_PID
+    RC=$?
+    [ $RC -eq 0 ] && echo_success || echo_failure
+    [ $RC -eq 0 ] && touch /var/lock/subsys/opensm
+    [ $RC -eq 0 ] && echo $OSM_PID > $PID_FILE
+    echo
+    return $RC
+}
+
+stop()
+{
+    [ -f /var/lock/subsys/opensm ] || return 0
+
+    echo -n "Stopping IB Subnet Manager."
+
+    OSM_PID=`cat $PID_FILE`
+
+    checkpid $OSM_PID
+    RC=$?
+    if [ $RC -ne 0 ]; then
+        rm -f $PID_FILE
+        rm -f /var/lock/subsys/opensm
+        echo_success
+        return 0
+    fi
+    # Kill opensm
+    kill -15 $OSM_PID > /dev/null 2>&1
+    cnt=0
+    while [ $cnt -lt 6 ]; do
+        checkpid $OSM_PID
+        if [ $? -ne 0 ]; then
+            break
+        fi
+        echo -n "."
+        sleep 1
+        cnt=$(( $cnt + 1 ))
+    done
+
+    checkpid $OSM_PID
+    if [ $? -eq 0 ]; then
+        kill -KILL $OSM_PID > /dev/null 2>&1
+        echo -n "+"
+        sleep 1
+    fi
+    checkpid $OSM_PID
+    DEAD=$?
+    if [ $DEAD -eq 0 ]; then
+        echo_failure
+        echo
+        return 1
+    fi
+    echo_success
+    echo
+
+    # Remove pid file if any.
+    rm -f $PID_FILE
+    rm -f /var/lock/subsys/opensm
+    return 0
+}
+
+restart ()
+{
+        stop
+        start
+}
+
+condrestart ()
+{
+        [ -f /var/lock/subsys/opensm ] && restart || return 0
+}
+
+reload ()
+{
+        [ -f $PID_FILE ] || return 0
+        OSM_PID=`cat $PID_FILE`
+        action $"Rescanning IB Subnet:" kill -HUP $OSM_PID
+        return $?
+}
+
+usage ()
+{
+        echo
+        echo "Usage: `basename $0` {start|stop|restart|condrestart|try-restart|force-reload|status}"
+        echo
+        return 2
+}
+
+case $ACTION in
+        start|stop|restart|reload|condrestart|try-restart|force-reload)
+            [ `id -u` != "0" ] && exit 4 ;;
+esac
+
+case $ACTION in
+        start) start; RC=$? ;;
+        stop) stop; RC=$? ;;
+        restart) restart; RC=$? ;;
+        reload) reload; RC=$? ;;
+        condrestart) condrestart; RC=$? ;;
+        try-restart) condrestart; RC=$? ;;
+        force-reload) condrestart; RC=$? ;;
+        status) status $prog; RC=$? ;;
+        *) usage; RC=$? ;;
+esac
+
+exit $RC
+
