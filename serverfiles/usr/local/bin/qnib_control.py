@@ -226,10 +226,10 @@ class MyApp(object):
             log_e = LOGentry('Stopping %s' % name)
             self.add_log(log_e)
             cmd.append('stop')
-        print ' '.join(cmd)
         init_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE)
         log_e.set_status('OK')
+	self.refresh_log()
     def ibsim(self, start=True):
         if start:
             log_e = LOGentry("Starting ibsim")
