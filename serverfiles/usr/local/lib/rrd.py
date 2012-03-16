@@ -59,7 +59,7 @@ class RRD(object):
             'DS:rcv_data:GAUGE:%s:U:U' % heartbeat,
             ]
                   
-        cmd_create = ['rrdtool', 'create', rrd_perf, '--step', interval]
+        cmd_create = ['/usr/bin/rrdtool', 'create', rrd_perf, '--step', interval]
         if start != None:
             cmd_create.extend([
                 '--start',
@@ -87,7 +87,7 @@ class RRD(object):
             'DS:link_downed:GAUGE:%s:U:U' % heartbeat
             ]
                   
-        cmd_create = ['rrdtool', 'create', rrd_err, '--step', interval]
+        cmd_create = ['/usr/bin/rrdtool', 'create', rrd_err, '--step', interval]
         if start != None:
             cmd_create.extend([
                 '--start',
@@ -104,7 +104,7 @@ class RRD(object):
 
     def update_perf(self, p_ext, ins):
         rrd_perf = "%s/%s_%s_perf.rrd" % (self.rrd_base, self.node_name, p_ext)
-        cmd_update = ['rrdtool', 'update', rrd_perf]
+        cmd_update = ['/usr/bin/rrdtool', 'update', rrd_perf]
         stamps = ins.keys()
         stamps.sort()
         for stamp in stamps:
@@ -116,7 +116,7 @@ class RRD(object):
     
     def update_err(self, p_ext, ins):
         rrd_err = "%s/%s_%s_err.rrd" % (self.rrd_base, self.node_name, p_ext)
-        cmd_update = ['rrdtool', 'update', rrd_err]
+        cmd_update = ['/usr/bin/rrdtool', 'update', rrd_err]
         stamps = ins.keys()
         stamps.sort()
         for stamp in stamps:
@@ -168,7 +168,7 @@ class RRD(object):
             mat = re.match(reg, file_name)
             p_ext = mat.group(1)
             plain_ports.append(p_ext)
-            cmd_html = ['rrdtool', 'fetch',
+            cmd_html = ['/usr/bin/rrdtool', 'fetch',
                         "%s%s" % (self.rrd_base, file_name),
                         '-s',start_time,'-e',end_time,'AVERAGE']
             process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
@@ -322,7 +322,7 @@ class RRD(object):
                 if not mat:
                     continue
                 p_ext = mat.group(1)
-                cmd_html = ['rrdtool', 'fetch',
+                cmd_html = ['/usr/bin/rrdtool', 'fetch',
                             "%s%s" % (self.rrd_base, file_name),
                             '-s',start_time,'-e',end_time,'AVERAGE']
                 process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
