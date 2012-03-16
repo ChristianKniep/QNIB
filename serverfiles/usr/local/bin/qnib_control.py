@@ -22,6 +22,7 @@ import sys
 import time
 import re
 import random
+import subprocess
 
 sys.path.append("/root/QNIB/serverfiles/usr/local/lib/")
 import libibsim
@@ -77,7 +78,7 @@ class LOG(object):
 
 class LOGentry(object):
     def __init__(self, desc):
-        self.desc   = desc.strip()
+        self.desc = desc.strip()
         self.status = ""
     def set_status(self, status):
         self.status = status.strip()
@@ -109,9 +110,11 @@ class MyApp(object):
 
         self.ibs = libibsim.IBsim("/root/QNIB/serverfiles/test/netlist.clos5", "/usr/bin/ibsim")
 
+        self.plain_start = False
         log_e = LOGentry("")
         self.log_text = [log_e]*10
         #self.start_services()
+
     def change_buttons(self):
         objs = self.builder.get_objects()
         for obj in objs:
@@ -172,11 +175,61 @@ class MyApp(object):
         index = random.randint(0, len(whitelist)-1)
         rand_node = whitelist[index]
         return rand_node
-    def switch_service(self, opt):
-        if opt.get_name()=='ibsim':
-            self.ibsim(opt.get_active())
-        elif opt.get_name()=='opensm':
-            self.opensm(opt.get_active())
+    def switch_service(self, obj):
+        if obj.get_name()=='ibsim':
+            osm_obj = self.builder.get_object('opensm')
+            ibn_obj = self.builder.get_object('ibnetdis')
+            if not obj.get_active():
+                # Stopping services depending on us
+                if ibn_obj.get_active():
+                    # Stopping ibnetdiscover
+                    ibn_obj.set_active(False)
+                if osm_obj.get_active():
+                    # Stopping opensm
+                    osm_obj.set_active(False)
+                time.sleep(1)
+            self.ibsim(obj.get_active())
+        elif obj.get_name() == 'opensm':
+            self.opensm(obj.get_active())
+        else:
+            self.init_d(obj)
+    def init_d(self, obj):
+        name = "qnib-%s" % obj.get_name()
+        if not self.plain_start:
+            # If we are supposed to check dependencies
+            osm_obj = self.builder.get_object('opensm')
+            netg_obj = self.builder.get_object('netgraph')
+            rrd_obj = self.builder.get_object('rrdservice')
+            ibn_obj = self.builder.get_object('ibnetdis')
+        cmd = ['service', name]
+        if self.plain_start or obj.get_active():
+            if not self.plain_start:
+                if not osm_obj.get_active():
+                    # the services depending on opensm, so we starting it
+                    osm_obj.set_active(True)
+                    time.sleep(0.3)
+                if name == 'qnib-netgraph' and not ibn_obj.get_active():
+                    # without new topology the service is not as good as it could be
+                    self.plain_start = True
+                    ibn_obj.set_active(True)
+                    self.plain_start = False
+                    time.sleep(0.3)
+            log_e = LOGentry('Starting %s' % name)
+            self.add_log(log_e)
+            cmd.append('start')
+        else:
+            if name == 'qnib-rrdservice' and \
+                    not ibn_obj.get_active() and \
+                    netg_obj.get_active():
+                # no rrd_service nor ibnetdiscover -> stop netgraph
+                netg_obj.set_active(False)
+            log_e = LOGentry('Stopping %s' % name)
+            self.add_log(log_e)
+            cmd.append('stop')
+        print ' '.join(cmd)
+        init_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+        log_e.set_status('OK')
     def ibsim(self, start=True):
         if start:
             log_e = LOGentry("Starting ibsim")
@@ -186,10 +239,25 @@ class MyApp(object):
         self.ibs.service_ibsim(log_e, start)
         self.refresh_log()
     def opensm(self, start=True):
+        rrd_obj = self.builder.get_object('rrdservice')
         if start:
             log_e = LOGentry("Starting opensm")
+            rrd_obj = self.builder.get_object('rrdservice')
+            ibs_obj = self.builder.get_object('ibsim')
+            if  not ibs_obj.get_active():
+                # Startup rrdservices
+                ibs_obj.set_active(True)
+            if  not self.plain_start and \
+                not rrd_obj.get_active():
+                # Startup rrdservices
+                self.plain_start = True
+                rrd_obj.set_active(True)
+                self.plain_start = False
         else:
             log_e = LOGentry("Stoping opensm")
+            if rrd_obj.get_active():
+                # Stopping rrdservice before us
+                rrd_obj.set_active(False)
         self.add_log(log_e)
         self.ibs.service_opensm(log_e, start)
         self.refresh_log()
@@ -207,11 +275,10 @@ class MyApp(object):
         obj.modify_font(pango.FontDescription('bold 10'))
     def change_textview(self, obj):
         """ Change color of the textbox"""
-        pass
         #obj.modify_base(gtk.STATE_NORMAL,gtk.gdk.color_parse('#000000'))
         #obj.modify_text(gtk.STATE_NORMAL,gtk.gdk.color_parse('#FFFFFF'))
         #obj.modify_font(pango.FontDescription('Monospace 11'))
-
+        pass
     def change_button(self,opt):
         cmap = opt.get_colormap()
         color_normal = cmap.alloc_color("darkgrey")
