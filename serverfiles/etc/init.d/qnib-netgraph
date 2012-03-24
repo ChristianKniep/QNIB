@@ -10,8 +10,8 @@ case "$1" in
         #To run it as root:
         /root/QNIB/serverfiles/usr/local/bin/create_netgraph.py \
             -g plain --loop &
-        /root/QNIB/serverfiles/usr/local/bin/create_netgraph.py \
-            -g perf --loop  &
+        #/root/QNIB/serverfiles/usr/local/bin/create_netgraph.py \
+        #    -g perf --loop  &
         echo "."
         ;;
   stop)
