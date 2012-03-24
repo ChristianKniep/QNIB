@@ -1,0 +1,97 @@
+Switch 5 "root1"
+[1]     "core11"[5]
+
+Switch 5 "core11"
+[1]     "spine11"[5]
+[2]     "spine12"[5]
+[5]     "root1"[1]
+
+Switch 5 "spine11"
+[1]     "switch111"[1]
+[2]     "switch112"[1]
+[5]    "core11"[1]
+
+Switch 5 "switch111"
+[1]     "spine11"[1]
+[2]    "node1111"[1] 4xDDR
+[3]    "node1112"[1]
+[4]    "node1113"[1]
+[5]    "node1114"[1]
+    
+Switch 8 "switch112"
+[1]     "spine11"[2]
+[2]    "node1121"[1]
+[3]    "node1122"[1]
+[4]    "node1123"[1]
+[5]    "node1124"[1]
+
+# switch111
+Hca 1 "node1111"
+[1] "switch111"[2] 4xDDR
+
+Hca 1 "node1112"
+[1] "switch111"[3]
+
+Hca 1 "node1113"
+[1] "switch111"[4]
+
+Hca 1 "node1114"
+[1] "switch111"[5]
+
+# switch112
+Hca 1 "node1121"
+[1] "switch112"[2]
+
+Hca 1 "node1122"
+[1] "switch112"[3]
+
+Hca 1 "node1123"
+[1] "switch112"[4]
+
+Hca 1 "node1124"
+[1] "switch112"[5]
+
+Switch 5 "spine12"
+[1]     "switch121"[1]
+[2]     "switch122"[1]
+[5]    "core11"[2]
+
+Switch 5 "switch121"
+[1]     "spine12"[1]
+[2]    "node1211"[1]
+[3]    "node1212"[1]
+[4]    "node1213"[1]
+[5]    "node1214"[1]
+    
+Switch 8 "switch122"
+[1]     "spine12"[2]
+[2]    "node1221"[1]
+[3]    "node1222"[1]
+[4]    "node1223"[1]
+[5]    "node1224"[1]
+
+# switch121
+Hca 1 "node1211"
+[1] "switch121"[2]
+
+Hca 1 "node1212"
+[1] "switch121"[3]
+
+Hca 1 "node1213"
+[1] "switch121"[4]
+
+Hca 1 "node1214"
+[1] "switch121"[5]
+
+# switch122
+Hca 1 "node1221"
+[1] "switch122"[2]
+
+Hca 1 "node1222"
+[1] "switch122"[3]
+
+Hca 1 "node1223"
+[1] "switch122"[4]
+
+Hca 1 "node1224"
+[1] "switch122"[5]

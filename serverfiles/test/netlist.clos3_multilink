@@ -1,0 +1,47 @@
+Switch 5 "spine1"
+[1]    "switch1"[1]
+[2]    "switch1"[2]
+[3]    "switch2"[1]
+[4]    "switch2"[2]
+
+Switch 8 "switch1"
+[1]    "spine1"[1]
+[2]    "spine1"[2]
+[5]    "node1"[1]
+[6]    "node2"[1]
+[7]    "node3"[1]
+[8]    "node4"[1]
+    
+Switch 8 "switch2"
+[1]    "spine1"[3]
+[2]    "spine1"[4]
+[5]    "node5"[1]
+[6]    "node6"[1]
+[7]    "node7"[1]
+[8]    "node8"[1]
+
+# switch2
+Hca 1 "node1"
+[1] "switch1"[5]
+
+Hca 1 "node2"
+[1] "switch1"[6]
+
+Hca 1 "node3"
+[1] "switch1"[7]
+
+Hca 1 "node4"
+[1] "switch1"[8]
+
+# switch2
+Hca 1 "node5"
+[1] "switch2"[5]
+
+Hca 1 "node6"
+[1] "switch2"[6]
+
+Hca 1 "node7"
+[1] "switch2"[7]
+
+Hca 1 "node8"
+[1] "switch2"[8]
