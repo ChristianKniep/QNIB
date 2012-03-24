@@ -58,7 +58,7 @@ class RRD(object):
             'DS:xmit_data:GAUGE:%s:U:U' % heartbeat,
             'DS:rcv_data:GAUGE:%s:U:U' % heartbeat,
             ]
-                  
+
         cmd_create = ['/usr/bin/rrdtool', 'create', rrd_perf, '--step', interval]
         if start != None:
             cmd_create.extend([
@@ -72,7 +72,7 @@ class RRD(object):
             ])
         process = subprocess.Popen(cmd_create, shell=False, stdout=subprocess.PIPE)
         process.communicate()
-        
+
     def create_err(self, interval, p_ext, start=None):  
         rrd_err = "%s/%s_%s_err.rrd" % (self.rrd_base, self.node_name, p_ext)
         if os.path.exists(rrd_err):
@@ -86,7 +86,7 @@ class RRD(object):
             'DS:vl15_dropped:GAUGE:%s:U:U' % heartbeat,
             'DS:link_downed:GAUGE:%s:U:U' % heartbeat
             ]
-                  
+
         cmd_create = ['/usr/bin/rrdtool', 'create', rrd_err, '--step', interval]
         if start != None:
             cmd_create.extend([
@@ -113,7 +113,7 @@ class RRD(object):
             cmd_update.append(val)
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
-    
+
     def update_err(self, p_ext, ins):
         rrd_err = "%s/%s_%s_err.rrd" % (self.rrd_base, self.node_name, p_ext)
         cmd_update = ['/usr/bin/rrdtool', 'update', rrd_err]
@@ -126,7 +126,7 @@ class RRD(object):
             cmd_update.append(val)
         process = subprocess.Popen(cmd_update, shell=False, stdout=subprocess.PIPE)
         process.communicate()
-    
+
     def html5(self, mins,s_time='now'):
         self.mins = mins
         self.html_code = """<!DOCTYPE HTML>
@@ -153,11 +153,11 @@ class RRD(object):
         file_d = open(self.html_file, "w")
         file_d.write(self.html_code)
         file_d.close()
-        
+
     def html5_tab(self, mins, s_time, typ):
         start_time = '%s-%s' % (s_time, mins * 60)  
         end_time = s_time
-        
+
         reg = "%s_(\d+)_%s\.rrd" % (self.node_name, typ)
         td_vals = {}
         td_vals_by_stamp = {}
@@ -172,7 +172,7 @@ class RRD(object):
                         "%s%s" % (self.rrd_base, file_name),
                         '-s',start_time,'-e',end_time,'AVERAGE']
             process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
-    
+
             (out, errc) = process.communicate()
             reg_head = "[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)[ \t]+([a-z_0-9]+)"
             for line in out.split('\n'):
@@ -254,7 +254,7 @@ class RRD(object):
             <tr>
                 <th></th>"""
                 counter += 1
-                
+
             self.html_code += """<td>%s</td>
             </tr>
             """ % "</td>\n                <td>".join(rrd_vals)
@@ -302,7 +302,7 @@ class RRD(object):
             <tr>
                 <th></th>"""
                 counter += 1
-            
+
             self.html_code += """<td>%s</td>
             </tr>
             """ % "</td>\n                <td>".join(rrd_vals)
@@ -314,7 +314,7 @@ class RRD(object):
     def html5_err(self, mins,s_time):
         start_time = '%s-%s' % (s_time, mins * 60)  
         end_time = s_time
-        
+
         reg = "%s_(\d+)_err\.rrd" % self.node_name
         for root, dirs, files in os.walk(self.rrd_base):
             for file_name in files:
@@ -326,7 +326,7 @@ class RRD(object):
                             "%s%s" % (self.rrd_base, file_name),
                             '-s',start_time,'-e',end_time,'AVERAGE']
                 process = subprocess.Popen(cmd_html, shell=False, stdout=subprocess.PIPE)
-        
+
                 (out, errc) = process.communicate()
                 self.html_code += """
                 <table class="line" style="display:none;">
@@ -341,7 +341,7 @@ class RRD(object):
                         </tr>
                     </thead>
                     <tbody>""" % (self.node_name, p_ext)
-                    
+
                 for line in out.split('\n'):
                     if not re.match('\d+', line): continue
                     try:
@@ -368,6 +368,6 @@ class RRD(object):
             </tbody>
         </table>
         """
-        
+
 class RRDException(Exception): pass
 

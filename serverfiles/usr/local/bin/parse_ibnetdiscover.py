@@ -157,7 +157,7 @@ class checks(object):
             cmd = "sudo  "
             if self.opt.ibsim:
                 cmd += "LD_PRELOAD=/usr/local/lib/umad2sim/libumad2sim.so"
-		cmd += ":/usr/lib64/umad2sim/libumad2sim.so "
+                cmd += ":/usr/lib64/umad2sim/libumad2sim.so "
             cmd += "/usr/local/sbin/ibnetdiscover -g"
             (ec, out) = commands.getstatusoutput(cmd)
             if ec != 0:
@@ -166,6 +166,7 @@ class checks(object):
             lines = out.split("\n")
         else:
             ibfile = "/root/kniepch/IB_FlowAndCongestionControl/serverfiles/%s" % self.opt.file
+            ibfile = "%s" % self.opt.file
             fd = open(ibfile, "r")
             lines = fd.readlines()
             fd.close()
@@ -588,32 +589,36 @@ def main():
         cfg = libTopology.config([options.cfgfile,],options)
         cfg.eval()
         log = libTopology.logC(options,"/var/log/parse_ibnetdiscover.log")
-        
+
         db = dbCon.dbCon(options)
-        
+
         (trap_dict, trap_list) = db.getTraps()
         chk = checks(db, options, cfg, log)
+        log.debug("%s Traps detected..." % len(trap_dict),1)
+	print "ibnetdis"
+        chk.ibnetdiscover()
+	print "evalSwPorts"
+        chk.evalSwPorts(cfg)
+	print "evalHistory"
+        chk.evalHistory()
+	print "evalMatches"
+        chk.evalMatches()
+        chk.addPerf('countInsLink',db.countInsLink)
         if len(trap_dict)>0 or options.force_uptopo:
-            log.debug("%s Traps detected..." % len(trap_dict),1)
-            chk.ibnetdiscover()
-            chk.evalSwPorts(cfg)
-            chk.evalHistory()
-            chk.evalMatches()
-            chk.addPerf('countInsLink',db.countInsLink)
             # Should we update the topology?
             # -> A new node appears
             # -> User removed a node for good
             chk.update_topo()
         else:
             log.debug("%s Traps detected..." % len(trap_dict),1)
-            
+
         # we sure should redraw the graph to visualize the traffic
         chk.create_graphs()
         chk.dump_log()
+        os.remove('/tmp/parse_ibnetdiscover.lock')
         # If we are not suppose to loop the script, we break
         if not options.loop:
             break
-        os.remove('/tmp/parse_ibnetdiscover.lock')
         time.sleep(int(options.loop_delay))
     ec=chk.getEC()
     sys.exit(ec)
