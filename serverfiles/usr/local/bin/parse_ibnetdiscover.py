@@ -25,6 +25,7 @@ sys.path.append('/root/QNIB/serverfiles/usr/local/lib/')
 import dbCon
 import libTopology
 
+
 class Parameter(object):
     def __init__(self):
         # Parameterhandling
@@ -37,6 +38,7 @@ class Parameter(object):
         # copy over all class.attributes
         self.__dict__ = self.options.__dict__
         self.args = args
+
     def default(self):
         # Default-Options
         self.parser.add_option("-d", action="count", dest="debug", help="increases debug [default:None, -d:1, -ddd: 3]")
@@ -44,9 +46,15 @@ class Parameter(object):
         self.parser.add_option("-L", dest="lids", default=False, action="store", help="lid to debug (all other debug information will be supressed)")
         self.parser.add_option("--check-traps", dest="check_traps", default=False, action="store_true", help="check for traps stored in the DB inserted from opensm")
         self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
-        self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
-        self.parser.add_option("--graphviz-cmd", dest="graphviz_cmd", default="sfdp", action = "store", help = "Graphviz cmd to layout graph (default: %default)")
-        self.parser.add_option("--ibsim", dest="ibsim", default=False, action = "store_true", help = "if we are running with ibsim, we have to PRELOAD libumad.so (default: %default)")
+        self.parser.add_option("-g", dest="graph", default=None, action="store", help="Graph to create (default: %default)")
+        self.parser.add_option("--graphviz-cmd", dest="graphviz_cmd",
+            default="twopi",
+            action="store",
+            help="Graphviz cmd to layout graph (default: %default)")
+        self.parser.add_option("--ibsim", dest="ibsim",
+            default=False,
+            action="store_true",
+            help="if we are running with ibsim, we have to PRELOAD libumad.so")
         self.parser.add_option("--loop", dest="loop", default=False, action = "store_true", help = "Loop the script")
         self.parser.add_option("--delay", dest="loop_delay", default=10, action = "store", help = "Delay in seconds if loop is set (default: %default)")
         self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
@@ -54,10 +62,13 @@ class Parameter(object):
         self.parser.add_option("--links",dest="links",default=False, action = "store_true", help = "Show link analysis debug information")
         self.parser.add_option("--db",dest="db",default=False, action = "store_true", help = "Show database debug information")
         self.parser.add_option("--force-uptopo",dest="force_uptopo",default=False, action = "store_true", help = "Force update of topology")
+
     def extra(self):
-        pass 
+        pass
+
     def check(self):
-        if self.debug==None: self.debug = 0
+        if self.debug == None:
+            self.debug = 0
         if self.lids:
             lids = self.lids.split(",")
             self.lids = set(lids)
@@ -70,6 +81,7 @@ def hasItems(l1,l2):
         if check: return True
     return False
 
+
 class swPort(object):
     def __init__(self,opt,switch,line, match):
         self.line       = line
@@ -79,13 +91,16 @@ class swPort(object):
         self.dportguid = ''
         self.ext_port   = False
         self.dext_port   = False
+
     def deb(self,lids,msg,deb=0):
         if self.opt.lids and hasItems(lids,self.opt.lids):
             print msg
         elif self.opt.debug>=deb:
             print msg
+
     def matching(self):
         (self.port,self.type,self.dguid,self.dport,self.dportguid,self.dname,self.dlid,self.width,self.speed) = self.match.groups()
+
     def eval(self,db,cfg):
         self.matching()
         # Meine Switchports zuerst
@@ -124,6 +139,7 @@ class swPortExtExt(swPort):
     def matching(self):
         (self.port,self.ext_port,self.type,self.dguid,self.dport,self.dext_port,self.dname,self.dlid,self.width,self.speed) = self.match.groups()
 
+
 class checks(object):
     def __init__(self, db, options, cfg, log):
         self.db = db
@@ -145,9 +161,10 @@ class checks(object):
         self.sysGuids = {}
         self.swPorts  = []
         self.cNr = None
-    def evalSwPorts(self,cfg):
+
+    def evalSwPorts(self, cfg):
         for swP in self.swPorts:
-            swP.eval(self.db,cfg)
+            swP.eval(self.db, cfg)
 
     def ibnetdiscover(self):
         db = self.db
@@ -237,7 +254,8 @@ class checks(object):
         self.statusList.append("%s commits" % db.commits)
         self.perfList.append("querys=%s" % db.querys)
         self.perfList.append("commits=%s" % db.commits)
-    def matchChassis(self,line):
+
+    def matchChassis(self, line):
         # chassis
         ## Chassis 1 (guid 0x8f104004050c6)
         r = "Chassis (\d+) \(guid 0x([0-9a-f]+)\)"
@@ -249,7 +267,7 @@ class checks(object):
             cId = self.db.getIns_ID('chassis',"c_guid='%s'" % str(chassisguid),['c_guid','c_nr','c_name'], \
                                     [str(chassisguid),self.cNr,self.chassisNames[chassisguid]['name']])
         return m
-    def matchContinue(self,line):
+    def matchContinue(self, line):
         # HCA-Zeilen
         # [1](guid)
         r='^\[1\]\(.*'
@@ -550,21 +568,22 @@ class checks(object):
         create_netgraph.create(self.opt, self.db, self.cfg, self.log)
     def set_guiStuff(self,qnib):
         self.qnib = qnib
-    
+
+
 def gui(qnib,opt):
     from qnib_control import logC, log_entry
-    
-    
+
+
     logE = log_entry("Exec parse_ibnetdiscover")
     qnib.addLog(logE)
-    
+
     cfg = libTopology.config([opt.cfgfile,],opt)
     cfg.eval()
-    
+
     db = dbCon.dbCon(opt)
-    
+
     log = logC(opt,qnib)
-    
+
     (trap_dict, trap_list) = db.getTraps()
     chk = checks(db, opt, cfg, log)
     chk.set_guiStuff(qnib)
@@ -578,42 +597,37 @@ def gui(qnib,opt):
         log.debug("No traps detected...",1)
     chk.gui_log(logE)
 
-    
-    
+
 def main():
     # Parameter
     while True:
         open('/tmp/parse_ibnetdiscover.lock', 'w').close() 
         options = Parameter()
         options.check()
-        cfg = libTopology.config([options.cfgfile,],options)
+        cfg = libTopology.config([options.cfgfile,], options)
         cfg.eval()
-        log = libTopology.logC(options,"/var/log/parse_ibnetdiscover.log")
+        log = libTopology.logC(options, "/var/log/parse_ibnetdiscover.log")
 
         db = dbCon.dbCon(options)
 
         (trap_dict, trap_list) = db.getTraps()
         chk = checks(db, options, cfg, log)
         log.debug("%s Traps detected..." % len(trap_dict),1)
-	print "ibnetdis"
         chk.ibnetdiscover()
-	print "evalSwPorts"
         chk.evalSwPorts(cfg)
-	print "evalHistory"
         chk.evalHistory()
-	print "evalMatches"
         chk.evalMatches()
-        chk.addPerf('countInsLink',db.countInsLink)
-        if len(trap_dict)>0 or options.force_uptopo:
+        chk.addPerf('countInsLink', db.countInsLink)
+        if len(trap_dict) > 0 or options.force_uptopo:
             # Should we update the topology?
             # -> A new node appears
             # -> User removed a node for good
             chk.update_topo()
+            #chk.create_graphs()
         else:
             log.debug("%s Traps detected..." % len(trap_dict),1)
 
         # we sure should redraw the graph to visualize the traffic
-        chk.create_graphs()
         chk.dump_log()
         os.remove('/tmp/parse_ibnetdiscover.lock')
         # If we are not suppose to loop the script, we break
@@ -626,4 +640,4 @@ def main():
 
 # ein Aufruf von main() ganz unten
 if __name__ == "__main__":
-   main()
+    main()

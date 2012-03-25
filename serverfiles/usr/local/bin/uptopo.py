@@ -263,7 +263,7 @@ def eval_topo(options,db,cfg,log):
     cDB.bkpDat()
 
     topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
-    topo.create(True)
+    topo.create()
     topo.fixPositions()
     
     cDB.bkpDat()
