@@ -229,7 +229,7 @@ class edgeClass(object):
 
     def getEdgeStr(self, graph):
         self.opts = "["
-        if graph!=None:
+        if graph != None:
             self.getEdgeStrByGraph(graph)
         self.opts += "]"
         if self.opts != "[]":
@@ -240,11 +240,11 @@ class edgeClass(object):
 
     def getEdgeStrByGraph(self, graph):
         # Posisiton brauchen wir immer
-        if self.edgeOpts['pos']!="" and self.edgeOpts['pos']!="None":
+        if self.edgeOpts['pos'] != "" and self.edgeOpts['pos'] != "None":
             self.opts += " pos=%s " % self.edgeOpts['pos']
-        if graph=="perf":
+        if graph == "perf":
             self.setPerfInfo()
-        elif graph=="plain":
+        elif graph == "plain":
             self.setTopoInfo()
         else:
             self.opts += ' arrowhead=\"none\"'
@@ -275,44 +275,54 @@ class edgeClass(object):
         query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' AND ge_dst_gnid='%s'" % (self.src_gnid,self.dst_gnid)
         self.rDB.ins(query)
 
+
 class parseNode(parseObj):
-    def __init__(self,db,opt,cfg,allGuids):
-        parseObj.__init__(self,db,opt,cfg,allGuids)
-        self.ports    = {}
-        self.nLinks   = {}
-        self.seen     = False
-        self.circle   = False
-        self.sw_cnt   = 0
-        self.extSw_cnt= 0
+    def __init__(self, db, opt, cfg, allGuids):
+        parseObj.__init__(self, db, opt, cfg, allGuids)
+        self.ports = {}
+        self.nLinks = {}
+        self.seen = False
+        self.circle = False
+        self.sw_cnt = 0
+        self.extSw_cnt = 0
         self.comp_cnt = 0
-    def addLink(self,dst,links,toDst=True):
-        self.deb("Adde '%s' zu links von '%s'" % ([link.__str__() for link in links],dst.name),'l',2)
+
+    def addLink(self, dst, links, toDst=True):
+        self.deb("Adde '%s' zu links von '%s'" % \
+                 ([link.__str__() for link in links], dst.name), 'l', 2)
         if self.nLinks.has_key(dst):
-            self.deb("Zusaetzlicher Link von '%s' nach '%s'" % (self.name,dst.name),'l',2)
+            self.deb("Zusaetzlicher Link von '%s' nach '%s'" % \
+                     (self.name, dst.name), 'l', 2)
             s = set(links)
-            try: self.nLinks[dst] |= s
+            try:
+                self.nLinks[dst] |= s
             except:
-                print type(self.nLinks[dst]),self.nLinks[dst]
+                print type(self.nLinks[dst]), self.nLinks[dst]
                 sys.exit()
         else:
-            self.deb("Neuer Link von '%s' nach '%s'" % (self.name,dst.name),'l',3)
+            self.deb("Neuer Link von '%s' nach '%s'" % \
+                     (self.name, dst.name), 'l', 3)
             s = set(links)
             self.nLinks[dst] = s
         if toDst:
-            dst.addLink(self,links,False)
-    def setSys(self,system):
+            dst.addLink(self, links, False)
+
+    def setSys(self, system):
         self.system = system
         self.s_id = system.s_id
-    def setGuid(self,guid):
+
+    def setGuid(self, guid):
         parseObj.setGuid(self,guid)
         self.evalGuid()
         self.insDB()
+
     def insDB(self):
         # Knoten wird guid angelegt
         if self.name:
             self.n_id = self.rDB.getIns_ID('nodes',"n_guid='%s' AND n_name='%s'" % (self.guid,self.name),['n_guid','n_name'], [self.guid,self.name],self.opt.debug)
         else:
             self.n_id = self.rDB.getIns_ID('nodes',"n_guid='%s'" % (self.guid),['n_guid',], [self.guid,],self.opt.debug)
+
     def createPort(self,pnr,pguid,lid):
         port = parsePort(self.rDB,self.opt,self.cfg,self.allGuids)
         port.setPNr(pnr)
@@ -323,24 +333,30 @@ class parseNode(parseObj):
         port.insDB()
         self.ports[pnr] = port
         return port
+
     def getPort(self,pnr):
         return self.ports[pnr]
+
     def setPortLid(self,pnr,lid):
         self.ports[pnr].lid = lid
+
     def evalGuid(self):
         guids = {} #self.cfg.get('nodeguids')
         parseObj.evalGuid(self,guids)
+
     def updateCnt(self):
         query = "UPDATE nodes SET"
         query += " sw_cnt='%s', extSw_cnt='%s', comp_cnt='%s'" % (self.sw_cnt,self.extSw_cnt,self.comp_cnt)
         query += " WHERE n_id='%s'" % self.n_id
         self.deb(query,"p",2)
         self.rDB.exe(query)
+
     def getLids(self):
         res = set([])
         for port in self.ports.values():
             res |= port.getLids()
         return res
+
     def updateDB(self):
         query = "UPDATE nodes SET"
         try:    name = self.name
@@ -357,17 +373,23 @@ class parseNode(parseObj):
         else:   query += " WHERE n_id='%s'" % n_id
         self.deb(query,"p",2)
         self.rDB.exe(query)
+
     def setType(self,typ):
         self.nt_id = self.rDB.getIns_ID('nodetypes',"nt_name='%s'" % typ,['nt_name',], [typ,],self.opt.debug)
         self.type = typ
+
     def setSwitch(self):
         self.setType('switch')
+
     def setHost(self):
         self.setType('host')
+
     def isType(self,types):
         return self.type in types
+
     def isSwitch(self):
         return self.isType(['switch', 'root'])
+
     def getIntSwLink(self,path=[]):
         freshLinks = [x for x in self.links.values() if (x.isInterswitch() and not x.seen and x not in path)]
         try:
@@ -375,15 +397,18 @@ class parseNode(parseObj):
         except IndexError:
             return None
         return res
+
     def createCircle(self,obj):
         cir_id = self.rDB.getIns_ID('circles',"n_id='%s' AND pathhex='%s'" % (str(self.n_id),obj),['n_id','pathhex'], [str(self.n_id),obj],self.opt.debug)
         return cir_id
+
     def setCircleLinks(self,cir_id,prv):
         self.deb("!!Kreisknoten: %s" % self,'l',1)
         for node,links in self.nLinks.items():
             if node==prv: 
                 for link in links:
                     link.setCircle(cir_id)
+
     def __str__(self):
         res = "%s[%s]%s" % (self.name,self.id,self.guid[-3:])
         if self.__dict__.has_key("s_id"):
@@ -601,57 +626,57 @@ class node(object):
         res = "name:%-5s || %s" % (self.name,self.nodeOpts)
         return res
 
-    def setNodeInfo(self, rDB, row, graph='plain'):
-        self.rDB = rDB
-        (sg_id, c_id, s_id, n_id, \
+    def setNodeInfo(self, row, graph='plain'):
+        (sg_id, c_id, s_id, n_id,
          n_status, gn_id, gn_name, gn_shape) = row
-        self.sg_id  =  sg_id
-        self.c_id   = c_id
-        self.s_id   = s_id
-        self.n_id   = n_id
+        self.sg_id = sg_id
+        self.c_id = c_id
+        self.s_id = s_id
+        self.n_id = n_id
         self.n_status = n_status
-        self.gn_id  = gn_id
-        self.nodeOpts['shape']  = gn_shape
+        self.gn_id = gn_id
+        self.nodeOpts['shape'] = gn_shape
         query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
-        res = self.rDB.sel(query)
+        res = self.cDB.sel(query)
         for row in res:
-            (key,val) = row
+            (key, val) = row
             self.nodeOpts[key] = val
         statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
-        res = self.rDB.selOne(statQ)
+        res = self.cDB.selOne(statQ)
         s_rev = res[0]
-        if graph=='plain':
-            self.nodeOpts['tooltip'] = "\"gn_id:%s // c_id:%s // s_id:%s // count(s_rev):%s // n_id:%s\"" % (gn_id, c_id, s_id, s_rev, n_id)
-        self.nodeOpts['URL'] = "\"index.php?map=root_perf&node_details=%s\"" % self.name
+        if graph == 'plain':
+            self.nodeOpts['tooltip'] = ""
+        self.nodeOpts['URL'] = "\"index.php?map=root_perf&node_details=%s\"" % \
+                                self.name
 
         if not self.nodeOpts['shape']:
-            if self.nt_name=='switch':
-                self.nodeOpts['shape']  = 'octagon'
-            elif self.nt_name=='host':
-                self.nodeOpts['shape']  = 'none'
+            if self.nt_name == 'switch':
+                self.nodeOpts['shape'] = 'octagon'
+            elif self.nt_name == 'host':
+                self.nodeOpts['shape'] = 'none'
         # Eval states
-        if self.n_status=="fail":
-                self.nodeOpts['fontcolor']  = 'red'
-        elif self.n_status=="new":
-                self.nodeOpts['fontcolor']  = 'darkgreen'
-                self.nodeOpts['style']      = 'filled'
-        elif self.n_status=="nok":
+        if self.n_status == "fail":
+                self.nodeOpts['fontcolor'] = 'red'
+        elif self.n_status == "new":
+                self.nodeOpts['fontcolor'] = 'darkgreen'
+                self.nodeOpts['style'] = 'filled'
+        elif self.n_status == "nok":
                 self.nodeOpts['fontcolor']  = 'blue'
-        elif self.n_status=="deg":
-            if self.nt_name=='switch':
-                self.nodeOpts['fontcolor']  = 'orange'
+        elif self.n_status == "deg":
+            if self.nt_name == 'switch':
+                self.nodeOpts['fontcolor'] = 'orange'
             else:
-                self.nodeOpts['fontcolor']  = 'red'
-        if graph=='perf' and self.nt_name in ('switch', 'root'):
-            # FIXME: link performance is cDB, locality rDB -> inconsistent
+                self.nodeOpts['fontcolor'] = 'red'
+        if graph == 'perf' and self.nt_name in ('switch', 'root'):
+            # FIXME: link performance is cDB, locality cDB -> inconsistent
             query = "SELECT * FROM getLocality('%s')" % gn_name
             res = rDB.selOne(query)
-            if len(res)>=1:
+            if len(res) >= 1:
                 (downRes, upRes, upIn, downOut, upOut, downIn) = res
                 (upin_downout, upout_downin) = res[:2]
                 locality = max(upin_downout, upout_downin)
-                self.nodeOpts['style']      = 'filled'
-                self.nodeOpts['fillcolor']  = fancy_color(upin_downout, upout_downin)
+                self.nodeOpts['style'] = 'filled'
+                self.nodeOpts['fillcolor'] = fancy_color(upin_downout, upout_downin)
                 self.nodeOpts['tooltip'] = "\"upIn/downOut:%s%% || upOut/downIn:%s%% \"" % (upin_downout, upout_downin)
 
     def getNodeOpts(self):
@@ -694,13 +719,14 @@ class node(object):
 
     def setInTopo(self):
         query = "UPDATE sg_nodes SET in_topo='t' WHERE gn_id='%s'" % self.gn_id
-        self.rDB.ins(query)
+        self.cDB.ins(query)
         query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' OR ge_dst_gnid='%s'" % (self.gn_id, self.gn_id)
-        self.rDB.ins(query)
+        self.cDB.ins(query)
 
 class nodeNid(node):
     """ Node class based on node_ids, this will lead to a graph that includes all ASICs"""
     def __init__(self,opt,db,cfg,n_id,IamIn=True):
+        raise IOError("wollte nicht in nodeNid")
         self.IamIn = IamIn
         self.cfg = cfg
         self.opt = opt
@@ -739,23 +765,23 @@ class nodeNid(node):
         self.children = []
         self.links = 1
 
-
 class nodeGnId(node):
     """ Node class based on graphnode_ids, this will lead to a graph that only shows chassis (systems)"""
-    def __init__(self,opt,db,cfg,gn_id,IamIn=True):
+    def __init__(self,opt, cDB, rDB, cfg, gn_id, IamIn=True):
         self.IamIn = IamIn
         self.cfg = cfg
         self.opt = opt
-        self.rDB = db
+        self.cDB = cDB
+        self.rDB = rDB
         select = " s.s_id, s_guid, s_name, s.c_id, gn_id, sg_id,gn_name, gn_shape, nt_name, sgn.in_topo"
         query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.s_id=sgn.s_id WHERE gn_id='%s'" % (select,gn_id)
         if self.opt.debug>=2: print query
-        res = self.rDB.sel(query)
+        res = self.cDB.sel(query)
         if len(res)==0:
             query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.c_id=sgn.c_id WHERE gn_id='%s'" % (select,gn_id)
-            res = self.rDB.sel(query)
+            res = self.cDB.sel(query)
         (self.s_id, self.s_guid, self.s_name, self.c_id, self.gn_id, self.sg_id, self.gn_name, self.gn_shape, self.nt_name,self.in_topo) = res[0]
-        
+
         if self.in_topo=='f':
             self.in_topo = False
         else:
@@ -1823,19 +1849,20 @@ class topology(object):
                 pass
         else:
             print "Typ '%s' hat noch keinen Zweig in topology.recursiv()" % item.nt_name
-        
+
         ### Und nun noch alle neu hinzugekommenen Switches
         switches = cDB.getGSwitches()
         for row in switches:
-            (n_id,name) = row
-            switch = node(self.opt,cDB,self.cfg,n_id)
+            (n_id, name) = row
+            switch = node(self.opt, cDB, self.cfg, n_id)
             self.recursiv(switch)
         return
-    def drawGEdges(self,fd):
+
+    def drawGEdges(self, fd):
         query = "SELECT ge_id,ge_src,ge_dst,ge_pos FROM g_edges"
         res = self.cDB.sel(query)
         for row in res:
-            (ge_id,ge_src,ge_dst,ge_pos) = row
+            (ge_id, ge_src, ge_dst, ge_pos) = row
             if ge_pos!="":
                 line = "%s -> %s [arrowhead =\"none\" pos=\"%s\"];" % (ge_src,ge_dst,ge_pos)
             else:
@@ -1851,54 +1878,6 @@ class topology(object):
             else:
                 line = "%s -> %s [arrowhead =\"none\"];" % (sge_src,sge_dst)
             self.write(fd,line)
-    def drawSgNodes_old(self,fd,sg_id):
-        query = "SELECT gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_shape FROM sg_nodes WHERE sg_id='%s' WHERE in_topo='f'" % sg_id
-        res = self.cDB.sel(query)
-        for row in res:
-            (gn_id,sg_id,s_id,n_id,c_id,gn_name,gn_shape) = row
-            statQ = "SELECT count(s_id) FROM systems WHERE s_rev='%s'" % s_id
-            res = self.cDB.selOne(query)
-            s_rev = res[0]
-            tt = "gn_id:%s // s_id:%s // count(s_rev):%s // n_id:%s" % (gn_id,c_id,s_id,s_rev,n_id)
-            setOpt = False
-            opts = "[ "
-            for k,v in {'shape':gn_shape,"tooltip":tt}.items():
-                if not (v==None or v==""):
-                    if k=='tooltip':
-                        opts += 'URL=None'
-                    setOpt = True
-                    opts += "%s=\"%s\"" % (k,v)
-            sgno_query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
-            sgno_res   = self.cDB.sel(query)
-            for sgno_row in sgno_res:
-                (key,val) = sgno_row
-                opts += "%s=\"%s\""
-            opts += "]"
-            if setOpt:
-                self.write(fd,"\"%s\" %s;" % (gn_name,opts))
-            else:
-                self.write(fd,"\"%s\";" % (gn_name))
-    def drawSubgraph(self,fd,sg):
-        (sg_id,sg_name) = sg
-        # Start
-        self.write(fd,"subgraph cluster_%s {" % sg_name)
-        self.tab += 1
-        # Options reinfuschen
-        option="graph [style=\"setlinewidth(0)\"]"
-        self.write(fd,option)
-        # options
-        query = "SELECT sgo_id,sg_id,sgo FROM sg_options WHERE sg_id='%s'" % sg_id
-        res = self.cDB.sel(query)
-        for row in res:
-            (sgo_id,sg_id,sgo) = row
-            self.write(fd,"%s;" % sgo)
-        #nodes
-        self.drawSgNodes(fd,sg_id)
-        # links
-        self.drawSGEdges(fd,sg_id)
-        # end
-        self.write(fd,"}")
-        self.tab -= 1
     def drawChassis(self,fd):
         c_query = "SELECT c_id,c_name FROM chassis"
         c_res = self.cDB.sel(c_query)
@@ -2050,9 +2029,8 @@ class myTopo(topology):
         for row in res:
             self.drawSubgraph(fd, row)
         # spine-Links schreiben
-        print "# in create"
         self.drawGNodes(fd)
-        self.drawGEdges(fd)
+        #self.drawGEdges(fd)
 
         self.write(fd, "}")
         fd.close()
@@ -2061,11 +2039,12 @@ class myTopo(topology):
         self.log.finish("create")
 
     def svg(self):
-        cmd = "neato -n1 -Tsvg -o/srv/www/qnib/root_%s.svg %s" % (self.graph,self.rFb)
+        cmd = "neato -n1 -Tsvg -o/srv/www/qnib/root_%s.svg %s" % (self.graph, self.rFb)
         #cmd = "neato -n1 -Tsvg -o/tmp/root_%s.svg %s" % (self.graph,self.rFb)
-        if self.opt.debug>=1: print cmd
-        (ec,out) = commands.getstatusoutput(cmd)
-        if ec!=0:
+        if self.opt.debug >= 1:
+            print cmd
+        (ec, out) = commands.getstatusoutput(cmd)
+        if ec != 0:
             print out
             raise IOError
 
@@ -2078,11 +2057,12 @@ class myTopo(topology):
                 WHERE sg_id='%s' AND sgn.in_topo='f'""" % sg_id
         res = self.cDB.sel(query)
         for row in res:
+            print row
             opts = ""
-            (sg_id, c_id, s_id, n_id, n_state_id, gn_id, \
-             gn_name, gn_shape) = row
-            item = nodeGnId(self.opt, self.cDB, self.cfg, gn_id)
-            item.setNodeInfo(self.rDB, row, self.graph)
+            (sg_id, c_id, s_id, n_id, n_status, \
+             gn_id, gn_name, gn_shape) = row
+            item = nodeGnId(self.opt, self.cDB, self.rDB, self.cfg, gn_id)
+            item.setNodeInfo(row, self.graph)
             if self.graph != None:
                 opts = item.getNodeOpts()
             self.write(fd, "\"%s\" %s;" % (gn_name, opts))
@@ -2102,8 +2082,8 @@ class myTopo(topology):
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
             print row
-            item = nodeGnId(self.opt, self.cDB, self.cfg, gn_id)
-            item.setNodeInfo(self.rDB, row, self.graph)
+            item = nodeGnId(self.opt,self.cDB, self.rDB, self.cfg, gn_id)
+            item.setNodeInfo(row, self.graph)
             if self.graph != None:
                 opts = item.getNodeOpts()
             self.write(fd, "\"%s\" %s;" % (gn_name,opts))

@@ -243,62 +243,62 @@ class graphSys(object):
         return self.c_id!=0
     def isSwitch(self):
         return self.nt_name=="switch"
-    
+
 def eval_topo(options,db,cfg,log):
-    
     if False:
         try: os.remove("/tmp/topology.db")
         except: pass
         cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
     else:
         cDB = libTopology.cacheDB(options, cfg, db, log)
-    
+
     rDB = dbCon.dbCon(options)
-    
+
     cDB.init()
     ## Los gehts
-    G = graph(cDB,options)
+    G = graph(cDB, options)
     G.evalSystems()
-    
+
     cDB.bkpDat()
 
     topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
     topo.create()
-    topo.fixPositions()
-    
+    #topo.fixPositions()
+
     cDB.bkpDat()
 
-def gui(qnib,opt):
+
+def gui(qnib, opt):
     from qnib_control import logC, log_entry
-    
+
     db = dbCon.dbCon(opt)
-    
+
     logE = log_entry("Exec uptopo")
     qnib.addLog(logE)
-    
+
     cfg = libTopology.config([opt.cfgfile,],opt)
     cfg.eval()
-    log = logC(opt,qnib)
+    log = logC(opt, qnib)
     eval_topo(opt, db, cfg, log)
-    
+
     logE.set_status(log.get_status())
     qnib.refresh_log()
-    
+
     #db.close("eval_topo")
+
 
 def main(argv=None):
     options = libTopology.Parameter(argv)
     options.check()
-    
-    db = dbCon.dbCon(opt)
-    
-    cfg = config([options.cfgfile,],options)
+
+    db = dbCon.dbCon(options)
+
+    cfg = libTopology.config([options.cfgfile, ], options)
     cfg.eval()
     log = libTopology.logC(options, "/var/log/uptopo.log")
     eval_topo(options, db, cfg, log)
-    
+
     #db.close("eval_topo")
-    
-    
+
 if __name__ == "__main__":
     main()

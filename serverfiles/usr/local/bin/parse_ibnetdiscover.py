@@ -733,8 +733,9 @@ def main():
             # Should we update the topology?
             # -> A new node appears
             # -> User removed a node for good
-            chk.update_topo()
+            #chk.update_topo()
             #chk.create_graphs()
+            pass
         else:
             log.debug("%s Traps detected..." % len(trap_dict), 1)
 
