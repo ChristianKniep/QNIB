@@ -16,7 +16,7 @@
 #
 # Copyright Christian Kniep, 2012
 
-import re 
+import re
 import os
 import sys
 import commands
@@ -31,12 +31,14 @@ import sqlite3
 import libTopology
 import dbCon
 
+
 class config(object):
     def __init__(self, cfgfiles, opt):
         self.opt = opt
         self.deb = opt.debug
         self.cfg = ConfigParser.ConfigParser()
         self.cfgfiles = cfgfiles
+
     def eval(self):
         for cfgfile in self.cfgfiles:
             self.cfg.read(cfgfile)
@@ -49,6 +51,7 @@ class config(object):
                     for opt in val.split(",,"):
                         (k, v) = opt.split(";;")
                         self.data[section][form][k] = v
+
     def __str__(self):
         res = ""
         for section, options in self.data.items():
@@ -56,71 +59,80 @@ class config(object):
             for option in options.keys():
                 res += "## %s\n" % option
         return res
-    def get(self, section, option=""):
-        if option == "":  return self.data[section]
-        else:           return self.data[section][option]
 
-    
-def create(options,rDB, cfg, log):
-    
+    def get(self, section, option=""):
+        if option == "":
+            return self.data[section]
+        else:
+            return self.data[section][option]
+
+
+def create(options, rDB, cfg, log):
+
     if False:
-        try: os.remove("/tmp/topology.db")
-        except: pass
-        cDB = libTopology.cacheDB(options, cfg, rDB, log,"/tmp/topology.db")
+        try:
+            os.remove("/tmp/topology.db")
+        except:
+            pass
+        cDB = libTopology.cacheDB(options, cfg, rDB, log, "/tmp/topology.db")
     else:
         cDB = libTopology.cacheDB(options, cfg, rDB, log)
-    
+
     # init with true clones topology also
     cDB.init(True)
     ## Los gehts
     topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
-    # Create Topology 
+    # Create Topology
     topo.create(options.graph)
     topo.svg()
-    
+
     # No Backup needed, we just use the DB
     #cDB.bkpDat()
     #db.close("create_netgraph")
-        
+
+
 def dump_log(rDB):
     query = "SELECT * FROM logs"
     res = rDB.sel(query)
     for row in res:
         print row
-        
-def gui(qnib,opt):
+
+
+def gui(qnib, opt):
     from qnib_control import logC, log_entry
     logE = log_entry("Exec create_netgraph")
     qnib.addLog(logE)
-    
-    cfg = libTopology.config([opt.cfgfile,],opt)
+
+    cfg = libTopology.config([opt.cfgfile, ], opt)
     cfg.eval()
-    log = logC(opt,qnib)
+    log = logC(opt, qnib)
     db = dbCon.dbCon(opt)
     create(opt, db, cfg, log)
-    
+
     logE.set_status(log.get_status())
     qnib.refresh_log()
-    
+
+
 def main(argv=None):
     options = libTopology.Parameter(argv)
     options.check()
-    
+
     rDB = dbCon.dbCon(options)
-    
+
     while True:
         if os.path.exists('/tmp/parse_ibnetdiscover.lock'):
             time.sleep(1)
             print "Lockfile exists"
             continue
-        cfg = config([options.cfgfile,],options)
+        cfg = config([options.cfgfile, ], options)
         cfg.eval()
         log = libTopology.logC("/var/log/create_netgraph.log")
         if os.path.exists('/tmp/parse_ibnetdiscover.lock'):
             time.sleep(1)
             print "Lockfile exists"
             continue
-        try: create(options, rDB, cfg, log)
+        try:
+            create(options, rDB, cfg, log)
         except IOError, e:
             print "Creation failed, I guess it overlaps with parse_ibnetdiscover"
             print e
@@ -128,10 +140,10 @@ def main(argv=None):
             continue
         else:
             dump_log(rDB)
-        
+
         if not options.loop:
             break
         time.sleep(int(options.loop_delay))
-    
+
 if __name__ == "__main__":
     main()
