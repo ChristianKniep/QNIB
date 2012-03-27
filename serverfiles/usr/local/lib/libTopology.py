@@ -720,8 +720,7 @@ class node(object):
     def setInTopo(self):
         query = "UPDATE sg_nodes SET in_topo='t' WHERE gn_id='%s'" % self.gn_id
         self.cDB.ins(query)
-        query = "UPDATE g_edges SET in_topo='t' WHERE ge_src_gnid='%s' OR ge_dst_gnid='%s'" % (self.gn_id, self.gn_id)
-        self.cDB.ins(query)
+
 
 class nodeNid(node):
     """ Node class based on node_ids, this will lead to a graph that includes all ASICs"""
@@ -910,7 +909,7 @@ class cacheDB(object):
             comp_cnt integer DEFAULT 0
             );""")
         self.__cur.execute("""CREATE TABLE ports (
-                p_id SERIAL,	
+                p_id SERIAL,
                 n_id integer references nodes(n_id) ON DELETE CASCADE,
                 p_guid varchar (32),
                 p_lid integer,
@@ -942,21 +941,21 @@ class cacheDB(object):
             );"""
             )
         self.__cur.execute("""CREATE TABLE circles_x (
-                cir_id integer,	
+                cir_id integer,
                 l_id integer,
                 CONSTRAINT circles_x_pk
                     PRIMARY KEY (cir_id,l_id)
             );"""
             )
         self.__cur.execute("""CREATE TABLE perfkey_types (
-                pkt_id SERIAL,	
+                pkt_id SERIAL,
                 pkt_name varchar (255),
                 CONSTRAINT perfkey_type_pk
                     PRIMARY KEY (pkt_id)
             );"""
             )
         self.__cur.execute("""CREATE TABLE perfkeys (
-                pk_id SERIAL,	
+                pk_id SERIAL,
                 pk_name varchar (255),
                 CONSTRAINT perfkey_pk
                     PRIMARY KEY (pk_id)
@@ -1286,7 +1285,7 @@ class cacheDB(object):
             ## Referenziere Altsysteme auf neues System
             query = "UPDATE systems SET s_rev='%s' WHERE s_id IN ('%s')" % (s_id,"','".join(s_ids))
             self.ins(query)
-            
+
             ## Erstelle Stelv-Node
             ### nt_name='switch'
             query = "SELECT nt_id FROM nodetypes WHERE nt_name='switch'"
@@ -1857,27 +1856,6 @@ class topology(object):
             switch = node(self.opt, cDB, self.cfg, n_id)
             self.recursiv(switch)
         return
-
-    def drawGEdges(self, fd):
-        query = "SELECT ge_id,ge_src,ge_dst,ge_pos FROM g_edges"
-        res = self.cDB.sel(query)
-        for row in res:
-            (ge_id, ge_src, ge_dst, ge_pos) = row
-            if ge_pos!="":
-                line = "%s -> %s [arrowhead =\"none\" pos=\"%s\"];" % (ge_src,ge_dst,ge_pos)
-            else:
-                line = "%s -> %s [arrowhead =\"none\"];" % (ge_src,ge_dst)
-            self.write(fd,line)
-    def drawSGEdges(self,fd,sg_id):
-        query = "SELECT sge_id,sge_src,sge_dst,sge_pos FROM sg_edges WHERE sg_id='%s'" % sg_id
-        res = self.cDB.sel(query)
-        for row in res:
-            (sge_id,sge_src,sge_dst,sge_pos) = row
-            if sge_pos!="": 
-                line = "%s -> %s [arrowhead =\"none\" pos=\"%s\"];" % (sge_src,sge_dst,sge_pos)
-            else:
-                line = "%s -> %s [arrowhead =\"none\"];" % (sge_src,sge_dst)
-            self.write(fd,line)
     def drawChassis(self,fd):
         c_query = "SELECT c_id,c_name FROM chassis"
         c_res = self.cDB.sel(c_query)
@@ -2016,6 +1994,14 @@ class myTopo(topology):
         fd = open(self.rFb, "w")
         self.tab = 0
         self.write(fd, "digraph G { overlap=none;")
+        # Set edges and nodes to be in the topology
+        query = "UPDATE sg_nodes SET in_topo='f'"
+        res = cDB.ins(query)
+        query = "UPDATE sg_edges SET in_topo='f'"
+        res = cDB.ins(query)
+        query = "UPDATE g_edges SET in_topo='f'"
+        res = cDB.ins(query)
+
         # Graph-Options
         query = "SELECT sgo FROM sg_options WHERE sg_id='0'"
         res = cDB.sel(query)
@@ -2030,7 +2016,7 @@ class myTopo(topology):
             self.drawSubgraph(fd, row)
         # spine-Links schreiben
         self.drawGNodes(fd)
-        #self.drawGEdges(fd)
+        self.drawGEdges(fd)
 
         self.write(fd, "}")
         fd.close()
@@ -2057,7 +2043,6 @@ class myTopo(topology):
                 WHERE sg_id='%s' AND sgn.in_topo='f'""" % sg_id
         res = self.cDB.sel(query)
         for row in res:
-            print row
             opts = ""
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
@@ -2082,7 +2067,7 @@ class myTopo(topology):
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
             print row
-            item = nodeGnId(self.opt,self.cDB, self.rDB, self.cfg, gn_id)
+            item = nodeGnId(self.opt, self.cDB, self.rDB, self.cfg, gn_id)
             item.setNodeInfo(row, self.graph)
             if self.graph != None:
                 opts = item.getNodeOpts()
@@ -2109,7 +2094,8 @@ class myTopo(topology):
             item.setInTopo()
 
     def drawGEdges(self, fd):
-        query = "SELECT ge_src_gnid,ge_src,ge_dst_gnid,ge_dst,ge_pos FROM g_edges WHERE in_topo='f'"
+        query = "SELECT ge_src_gnid, ge_src, ge_dst_gnid, ge_dst, ge_pos "
+        query += "FROM g_edges WHERE in_topo='f'"
         res = self.cDB.sel(query)
         rowS = set([])
         # ugly hack to prevent multiple links being drawn multiple times
@@ -2127,8 +2113,9 @@ class myTopo(topology):
         sg_res = self.cDB.sel(sg_query)
         for sg_row in sg_res:
             (gn_id, gn_name) = sg_row
-            query = """SELECT ge_src_gnid,ge_src,ge_dst_gnid,ge_dst,ge_pos
-                       FROM g_edges WHERE ge_src_gnid='%s'
+            query = """SELECT sge_src_nid, sge_src,
+                              sge_dst_nid, sge_dst, sge_pos
+                       FROM sg_edges WHERE sge_src_nid='%s'
                                     AND in_topo='f'""" % gn_id
             res = self.cDB.sel(query)
             rowS = set([])
@@ -2136,15 +2123,16 @@ class myTopo(topology):
             for row in res:
                 rowS.add(row)
             for row in rowS:
-                (ge_src_gnid,ge_src,ge_dst_gnid,ge_dst,ge_pos) = row
-                if self.cDB.isSwitch(ge_dst_gnid,ge_dst): continue
-                edge = edgeClass(self.opt,self.cDB,self.cfg,self.log)
+                (sge_src_gnid, sge_src, sge_dst_gnid, sge_dst, sge_pos) = row
+                if self.cDB.isSwitch(sge_dst_gnid, sge_dst):
+                    continue
+                edge = edgeClass(self.opt, self.cDB, self.cfg, self.log)
                 edge.setInfo(row, self.graph)
                 edge.setInTopo()
                 # Die Links muessen nur evaluiert werden, wenn der port-Graph erstellt wird
                 #if self.graph in ('port','locality','congestion'): edge.evalLinks()
                 self.write(fd, edge.getEdgeStr(self.graph))
-                self.drawNode(fd, ge_dst_gnid)
+                self.drawNode(fd, sge_dst_gnid)
 
     def drawSubgraph(self, fd, sg):
         (sg_id, sg_name) = sg
@@ -2168,7 +2156,7 @@ class myTopo(topology):
         self.write(fd, "}")
         self.tab -= 1
 
-    def extraEdgeOptsPort(self,item):
+    def extraEdgeOptsPort(self, item):
         pass
 
 
