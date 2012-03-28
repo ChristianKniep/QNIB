@@ -26,117 +26,138 @@ sys.path.append('/root/QNIB/usr/local/lib/')
 import sqlite3
 import uptopo 
 
+
 def all(iterable):
     for element in iterable:
         if not element:
             return False
     return True
+
+
 def any(iterable):
     for element in iterable:
         if element:
             return True
     return False
 
+
 class logC(object):
     def __init__(self, opt, log_file=None):
         self.opt = opt
-        self.log_file   = log_file
+        self.log_file = log_file
         self.statusTXT = ""
         self.perfTXT = ""
         self.retEC = 0
         self.s = {}
-        self.res  = {}
+        self.res = {}
+
     def addPerf(self,key,val):
         self.perfTXT    += "%s=%s, " % (key,val)
         if val!=0:
             self.statusTXT  += "%sms %s, " % (val,key)
+
     def __str__(self):
-        if   self.retEC==0: retTXT = "OK"
-        elif self.retEC==1: retTXT = "WARN"
-        elif self.retEC==2: retTXT = "CRIT"
-        retTXT += " - %s | %s" % (self.statusTXT,self.perfTXT)
+        if   self.retEC == 0:
+            retTXT = "OK"
+        elif self.retEC == 1:
+            retTXT = "WARN"
+        elif self.retEC == 2:
+            retTXT = "CRIT"
+        retTXT += " - %s | %s" % (self.statusTXT, self.perfTXT)
         # perfdata
         if self.log_file:
-            fd = open(self.log_file,"a")
+            fd = open(self.log_file, "a")
             fd.write("%s\n" % retTXT)
             fd.close()
         return retTXT
+
     def getEC(self):
         return self.retEC
-    def start(self,stat):
-        if not self.res.has_key(stat): self.res[stat] = 0
+
+    def start(self, stat):
+        if not self.res.has_key(stat):
+            self.res[stat] = 0
         self.s[stat] = time.time()
-    def end(self,stat):
+
+    def end(self, stat):
         e = time.time()
-        self.res[stat] += int((e - self.s[stat])*1000)
+        self.res[stat] += int((e - self.s[stat]) * 1000)
         self.s[stat] = 0
-    def finish(self,stat):
-        self.addPerf(stat,self.res[stat])
+
+    def finish(self, stat):
+        self.addPerf(stat, self.res[stat])
         self.res[stat] = 0
+
     def debug(self, msg, deb=3):
-        if self.opt.debug>=deb:
+        if self.opt.debug >= deb:
             print msg
 
+
 class parseObj(object):
-    def __init__(self,db,opt,cfg,allGuids):
-        self.rDB         = db
-        self.opt        = opt
-        self.cfg        = cfg
-        self.allGuids   = allGuids
-        self.name       = False
-        self.id         = self.__repr__().split("at ")[1][-5:-1]
+    def __init__(self, db, opt, cfg, allGuids):
+        self.rDB = db
+        self.opt = opt
+        self.cfg = cfg
+        self.allGuids = allGuids
+        self.name = False
+        self.id = self.__repr__().split("at ")[1][-5:-1]
+
     def setName(self,name):
-        self.hostPat    = self.cfg.get("hostpat")
-        self.name       = name
+        self.hostPat = self.cfg.get("hostpat")
+        self.name = name
         self.evalName()
+
     def evalName(self):
         #IN: Hostname
         #OUT: name,Type
-        r = "(%s)" % "|".join(self.hostPat.keys())
-        m=re.match(r,self.name,re.I)
-        if m:
-            for r in self.hostPat.keys():
-                m = re.match("^%s$"%r,self.name,re.I)
-                if m:
-                    if self.hostPat[r].has_key('regname'):
+        reg = "(%s)" % "|".join(self.hostPat.keys())
+        mat = re.match(reg, self. name, re.I)
+        if mat:
+            for reg in self.hostPat.keys():
+                mat = re.match("^%s$" % reg, self.name, re.I)
+                if mat:
+                    if self.hostPat[reg].has_key('regname'):
                         # Regname formatiert die groups des regex neu
                         # X,Y sind platzhalter fuer die jeweiligen Matches
                         # Bei X wird die aktuelle Gruppe eingetragen
                         # Y wird ausgelassen, z.B. wenn man oder matched '(spine|line)' 
-                        regname = self.hostPat[r]['regname']
+                        regname = self.hostPat[reg]['regname']
                         res = ""
                         c = 1
                         for x in regname:
-                            if x=="X":
+                            if x == "X":
                                 res += m.group(c)
-                                c+=1
-                            elif x=="%":
+                                c += 1
+                            elif x == "%":
                                 res += self.lid
-                            elif x=="Y":
-                                c+=1
+                            elif x == "Y":
+                                c += 1
                             else:
                                 res += x
                         self.name = res
-                    if self.hostPat[r].has_key('type'):
+                    if self.hostPat[reg].has_key('type'):
                         self.type = self.hostPat[r]['type']
                         if type(self) is parseNode:
-                            self.nt_id = self.rDB.getIns_ID('nodetypes',"nt_name='%s'" % self.type,['nt_name'], [self.type],self.opt.debug)
-                    if self.hostPat[r].has_key('name'):
-                        self.name = self.hostPat[r]['name']
-                    if self.hostPat[r].has_key('short'):
-                        self.name = "%s%s" % (self.hostPat[r]['short'],m.group(2))
+                            self.nt_id = self.rDB.getIns_ID('nodetypes', "nt_name='%s'" % self.type, ['nt_name'], [self.type], self.opt.debug)
+                    if self.hostPat[reg].has_key('name'):
+                        self.name = self.hostPat[reg]['name']
+                    if self.hostPat[reg].has_key('short'):
+                        self.name = "%s%s" % (self.hostPat[reg]['short'], mat.group(2))
+
     def setLid(self,lid):
         self.lid = str(lid)
+
     def getLids(self):
         if self.__dict__.has_key("lid"):
             return set([self.lid])
         else:
             return set([])
+
     def setGuid(self,guid):
-        if guid!='':
+        if guid != '':
             self.guid = guid
             if not self.allGuids.has_key(guid):
-                if not re.match("[0-9a-z]+",guid,re.I):
+                if not re.match("[0-9a-z]+", guid, re.I):
                     print "GUID '%s' does not match GUID-Form" % guid
                     sys.exit(2)
                 self.allGuids[guid] = self
@@ -214,11 +235,11 @@ class edgeClass(object):
         self.log = log
 
     def setInfo(self, row, graph):
-        (self.src_gnid, self.src_name, self.dst_gnid, self.dst_name, pos) = row
+        (self.src_gnid, self.src_name, self.dst_gnid, self.dst_name) = row
         if graph != None:
             print graph
             self.perfcache = self.rDB.getLinkPerf(self.src_name, self.dst_name)
-        self.edgeOpts = {'pos':pos}
+        self.edgeOpts = {}
 
     def __str__(self):
         res = []
@@ -240,8 +261,6 @@ class edgeClass(object):
 
     def getEdgeStrByGraph(self, graph):
         # Posisiton brauchen wir immer
-        if self.edgeOpts['pos'] != "" and self.edgeOpts['pos'] != "None":
-            self.opts += " pos=%s " % self.edgeOpts['pos']
         if graph == "perf":
             self.setPerfInfo()
         elif graph == "plain":
@@ -636,7 +655,7 @@ class node(object):
         self.n_status = n_status
         self.gn_id = gn_id
         self.nodeOpts['shape'] = gn_shape
-        query = "SELECT sgno_key, sgno_val FROM sgn_options WHERE sgn_id='%s'" % gn_id
+        query = "SELECT gno_key, gno_val FROM gn_options WHERE gn_id='%s'" % gn_id
         res = self.cDB.sel(query)
         for row in res:
             (key, val) = row
@@ -718,7 +737,7 @@ class node(object):
         return c
 
     def setInTopo(self):
-        query = "UPDATE sg_nodes SET in_topo='t' WHERE gn_id='%s'" % self.gn_id
+        query = "UPDATE g_nodes SET in_topo='t' WHERE gn_id='%s'" % self.gn_id
         self.cDB.ins(query)
 
 
@@ -764,31 +783,38 @@ class nodeNid(node):
         self.children = []
         self.links = 1
 
+
 class nodeGnId(node):
     """ Node class based on graphnode_ids, this will lead to a graph that only shows chassis (systems)"""
-    def __init__(self,opt, cDB, rDB, cfg, gn_id, IamIn=True):
+    def __init__(self, opt, cDB, rDB, cfg, gn_id, IamIn=True):
         self.IamIn = IamIn
         self.cfg = cfg
         self.opt = opt
         self.cDB = cDB
         self.rDB = rDB
-        select = " s.s_id, s_guid, s_name, s.c_id, gn_id, sg_id,gn_name, gn_shape, nt_name, sgn.in_topo"
-        query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.s_id=sgn.s_id WHERE gn_id='%s'" % (select,gn_id)
-        if self.opt.debug>=2: print query
+        select = " s.s_id, s_guid, s_name, s.c_id, gn_id, sg_id,gn_name, gn_shape, nt_name, gn.in_topo"
+        query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN g_nodes gn ON s.s_id=gn.s_id WHERE gn_id='%s'" % (select,gn_id)
+        if self.opt.debug >= 2:
+            print query
         res = self.cDB.sel(query)
-        if len(res)==0:
-            query = "SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes NATURAL JOIN nodetypes JOIN sg_nodes sgn ON s.c_id=sgn.c_id WHERE gn_id='%s'" % (select,gn_id)
+        if len(res) == 0:
+            query = """SELECT DISTINCT %s FROM systems s NATURAL JOIN nodes
+                            NATURAL JOIN nodetypes
+                            JOIN g_nodes gn ON s.c_id=gn.c_id
+                            WHERE gn_id='%s'""" % (select, gn_id)
             res = self.cDB.sel(query)
-        (self.s_id, self.s_guid, self.s_name, self.c_id, self.gn_id, self.sg_id, self.gn_name, self.gn_shape, self.nt_name,self.in_topo) = res[0]
+        (self.s_id, self.s_guid, self.s_name, self.c_id, self.gn_id,
+         self.sg_id, self.gn_name, self.gn_shape,
+         self.nt_name, self.in_topo) = res[0]
 
         if self.in_topo=='f':
             self.in_topo = False
         else:
             self.in_topo = True
-        self.name    = self.gn_name
-        self.root    = None
-        self.parent  = None
-        self.typ     = None
+        self.name = self.gn_name
+        self.root = None
+        self.parent = None
+        self.typ = None
         self.inGraph = False
         self.nodeOpts = {
             'pos':None,
@@ -832,22 +858,23 @@ def regexp(expr, item):
 
 
 class cacheDB(object):
-    def __init__(self,opt,cfg,db,log,filename=None):
+    def __init__(self, opt, cfg, db, log, filename=None):
         self.opt = opt
         self.cfg = cfg
         self.log = log
         self.rDB = db
         self.commitCount = 0
-        self.querys      = 0
-        if filename is None: filename=":memory:"
-        sql_conn=sqlite3.connect(filename)
-    
-        sql_conn.isolation_level="DEFERRED"
+        self.querys = 0
+        if filename is None:
+            filename = ":memory:"
+        sql_conn = sqlite3.connect(filename)
+
+        sql_conn.isolation_level = "DEFERRED"
         #sql_conn.isolation_level="EXCLUSIVE"
         #sql_conn.isolation_level=None
-    
-        sql_cursor=sql_conn.cursor()
-    
+
+        sql_cursor = sql_conn.cursor()
+
         sql_cursor.execute("PRAGMA synchronous=OFF")
         sql_cursor.execute("PRAGMA count_changes=OFF")
         sql_cursor.execute("PRAGMA journal_mode=MEMORY")
@@ -888,7 +915,7 @@ class cacheDB(object):
             c_id integer DEFAULT 0
             );""")
         self.__cur.execute("""CREATE TABLE nodetypes (
-                nt_id SERIAL,	
+                nt_id SERIAL,
                 nt_name varchar (32),
                 CONSTRAINT nodetypes_pk
                     PRIMARY KEY (nt_id)
@@ -996,7 +1023,6 @@ class cacheDB(object):
                 ge_src varchar(32),
                 ge_dst_gnid INTEGER,
                 ge_dst varchar(32),
-                ge_pos varchar(96),
                 in_topo boolean DEFAULT 'f'
             );"""
             )
@@ -1007,17 +1033,17 @@ class cacheDB(object):
                 CONSTRAINT doppelcheck UNIQUE (sg_id,sgo)
             );"""
             )
-        self.__cur.execute("""CREATE TABLE sgn_options (
-                sgno_id INTEGER PRIMARY KEY,
-                sgn_id INTEGER,
-                sgno_key varchar(56),
-                sgno_val varchar(255),
-                CONSTRAINT doppelcheck UNIQUE (sgn_id,sgno_key)
+        self.__cur.execute("""CREATE TABLE gn_options (
+                gno_id INTEGER PRIMARY KEY,
+                gn_id INTEGER,
+                gno_key varchar(56),
+                gno_val varchar(255),
+                CONSTRAINT doppelcheck UNIQUE (gn_id,gno_key)
             );"""
             )
-        self.__cur.execute("""CREATE TABLE sg_nodes (
+        self.__cur.execute("""CREATE TABLE g_nodes (
                 gn_id INTEGER PRIMARY KEY,
-                sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE, --Nodes are connected to subgraph
+                sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE,
                 s_id INTEGER,
                 n_id INTEGER,
                 c_id INTEGER DEFAULT 0,
@@ -1028,12 +1054,11 @@ class cacheDB(object):
             )
         self.__cur.execute("""CREATE TABLE sg_edges (
                 sge_id INTEGER PRIMARY KEY,
-                sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE, --Nodes are connected to subgraph
-                sge_src_nid INTEGER REFERENCES nodes(n_id),
+                sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE,
+                sge_src_gnid INTEGER REFERENCES g_nodes(gn_id),
                 sge_src varchar(32),
-                sge_dst_nid INTEGER REFERENCES nodes(n_id),
+                sge_dst_gnid INTEGER REFERENCES g_nodes(gn_id),
                 sge_dst varchar(32),
-                sge_pos varchar(96),
                 in_topo boolean DEFAULT 'f'
             );""")
         self.__cur.execute("""CREATE TABLE sg_lines (
@@ -1080,8 +1105,8 @@ class cacheDB(object):
             'subgraphs',
             'g_edges',
             'sg_options',
-            'sgn_options',
-            'sg_nodes',
+            'gn_options',
+            'g_nodes',
             'sg_edges',
             ])
         for tab in tabs:
@@ -1093,8 +1118,8 @@ class cacheDB(object):
             'subgraphs',
             'g_edges',
             'sg_options',
-            'sg_nodes',
-            'sgn_options',
+            'g_nodes',
+            'gn_options',
             'sg_edges',
         ]
         for tab in tabs:
@@ -1154,7 +1179,7 @@ class cacheDB(object):
             self.__cur.execute("INSERT INTO states (state_name) VALUES ('nok');")
             self.__cur.execute("INSERT INTO states (state_name) VALUES ('fail');")
         else:
-            self.__cur.execute("UPDATE sg_nodes SET in_topo='f';")
+            self.__cur.execute("UPDATE g_nodes SET in_topo='f';")
             self.__cur.execute("UPDATE sg_edges SET in_topo='f';")
             self.__cur.execute("UPDATE g_edges SET in_topo='f';")
         self.commit()
@@ -1228,15 +1253,19 @@ class cacheDB(object):
         return sg_id
     def addNode(self,sg_id,node,shape=""):
         (n_id,name,nt_name) = node
-        query = "SELECT * FROM sg_nodes WHERE gn_name='%s' AND gn_shape='%s'" % (name,shape)
+        query = "SELECT * FROM g_nodes WHERE gn_name='%s' AND gn_shape='%s'" % \
+                (name, shape)
         res = self.sel(query)
-        if len(res)>0:
-            #print "Node '%s' schon in sg_nodes vorhanden..." % name
+        if len(res) > 0:
+            #print "Node '%s' schon in g_nodes vorhanden..." % name
             pass
         else:
-            query = "INSERT INTO sg_nodes (gn_id,sg_id,n_id,gn_name,gn_shape) VALUES (NULL,'%s','%s','%s','%s')" % (sg_id,n_id,name,shape)
+            query = """INSERT INTO g_nodes (gn_id,sg_id,n_id,gn_name,gn_shape)
+                        VALUES (NULL,'%s','%s','%s','%s')""" % \
+                        (sg_id,n_id,name,shape)
             self.ins(query)
-            if self.opt.debug>=2: print query
+            if self.opt.debug >= 2:
+                print query
             query = "UPDATE nodes SET in_topo='t' WHERE n_id='%s'" % n_id
             self.ins(query)
     def addCluster(self,sg_name):
@@ -1247,20 +1276,20 @@ class cacheDB(object):
         return sg_id
     def addSys(self,system,sg_id=0):
         (s_id,c_id,name,n_state_id, nt_name) = system
-        query = "SELECT gn_id,sg_id,s_id,gn_name,gn_shape FROM sg_nodes WHERE gn_name='%s'" % (name)
+        query = "SELECT gn_id,sg_id,s_id,gn_name,gn_shape FROM g_nodes WHERE gn_name='%s'" % (name)
         res = self.sel(query)
         if len(res)>0:
-            #print "Node '%s' schon in sg_nodes vorhanden..." % name
+            #print "Node '%s' schon in g_nodes vorhanden..." % name
             (gn_id,sg_id,s_id,gn_name,gn_shape) = res[0]
             return gn_id
         else:
             shape = ''
             # TODO: ugly hardcoded status
             if n_state_id==4: shape='box'
-            query = "INSERT INTO sg_nodes (gn_id,sg_id,s_id,gn_name,gn_shape) VALUES (NULL,'%s','%s','%s','%s')" % (sg_id, s_id, name,shape)
+            query = "INSERT INTO g_nodes (gn_id,sg_id,s_id,gn_name,gn_shape) VALUES (NULL,'%s','%s','%s','%s')" % (sg_id, s_id, name,shape)
             self.ins(query)
             if self.opt.debug>=2 or name=="": print query
-            query = "SELECT gn_id FROM sg_nodes WHERE s_id='%s'" % s_id
+            query = "SELECT gn_id FROM g_nodes WHERE s_id='%s'" % s_id
             gn_id = self.selOne(query)
             query = "UPDATE nodes SET in_topo='t' WHERE s_id='%s'" % s_id
             self.ins(query)
@@ -1441,7 +1470,7 @@ class cacheDB(object):
                             n1.n_name,
                             n1.n_state_id,
                             nt1.nt_name,
-                            sgn1.gn_id,
+                            gn1.gn_id,
                             s1.s_name,
                             s1.s_guid,
                             s1.s_id,
@@ -1453,7 +1482,7 @@ class cacheDB(object):
                             s2.s_id,
                             s2.s_guid,
                             s2.s_name,
-                            sgn2.gn_id,
+                            gn2.gn_id,
                             nt2.nt_name,
                             n2.n_state_id,
                             n2.n_name,
@@ -1463,7 +1492,7 @@ class cacheDB(object):
                             p2.p_lid
                         FROM links l,ports p1,ports p2,nodes n1,nodes n2,
                              nodetypes nt1, nodetypes nt2, systems s1,
-                             systems s2,sg_nodes sgn1,sg_nodes sgn2,
+                             systems s2,g_nodes gn1,g_nodes gn2,
                              chassis c1, chassis c2
                         WHERE   l.src = p1.p_id AND
                                 l.dst=p2.p_id AND
@@ -1473,8 +1502,8 @@ class cacheDB(object):
                                 n2.nt_id=nt2.nt_id AND
                                 n1.s_id=s1.s_id AND
                                 n2.s_id=s2.s_id AND
-                                s1.s_id=sgn1.s_id AND
-                                s2.s_id=sgn2.s_id AND
+                                s1.s_id=gn1.s_id AND
+                                s2.s_id=gn2.s_id AND
                                 s1.c_id=c1.c_id AND
                                 s2.c_id=c2.c_id AND
                                 (s1.s_id='%s' OR s2.s_id='%s')""" % (s_id,s_id)
@@ -1489,7 +1518,7 @@ class cacheDB(object):
                             n1.n_name,
                             n1.n_state_id,
                             nt1.nt_name,
-                            sgn1.gn_id,
+                            gn1.gn_id,
                             s1.s_name,
                             s1.s_guid,
                             s1.s_id,
@@ -1501,7 +1530,7 @@ class cacheDB(object):
                             s2.s_id,
                             s2.s_guid,
                             s2.s_name,
-                            sgn2.gn_id,
+                            gn2.gn_id,
                             nt2.nt_name,
                             n2.n_state_id,
                             n2.n_name,
@@ -1511,7 +1540,7 @@ class cacheDB(object):
                             p2.p_lid
                         FROM links l,ports p1,ports p2,nodes n1,nodes n2,
                              nodetypes nt1, nodetypes nt2, systems s1,
-                             systems s2,sg_nodes sgn1,sg_nodes sgn2,
+                             systems s2,g_nodes gn1,g_nodes gn2,
                              chassis c1, chassis c2
                         WHERE   l.src = p1.p_id AND
                                 l.dst=p2.p_id AND
@@ -1521,10 +1550,10 @@ class cacheDB(object):
                                 n2.nt_id=nt2.nt_id AND
                                 n1.s_id=s1.s_id AND
                                 n2.s_id=s2.s_id AND
-                                s1.s_id=sgn1.s_id AND
+                                s1.s_id=gn1.s_id AND
                                 s1.c_id=c1.c_id AND
                                 s2.c_id=c2.c_id AND
-                                s2.s_id=sgn2.s_id"""
+                                s2.s_id=gn2.s_id"""
         return self.getLinkListRes(query)
     def getLinkListRes(self,query):
         res = self.sel(query)
@@ -1573,6 +1602,7 @@ class cacheDB(object):
             acc['d_p_lid']=d_lid
             back.append(acc)
         return back
+
     def addGEdges(self,item):
         (s_id,s_name,n_id,n_guid,n_name,nt_id,in_topo,nt_name) = item
         nids = self.getChilds(item)
@@ -1589,7 +1619,7 @@ class cacheDB(object):
             else:
                 dst_name = dst_nName
 
-            queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (n_id,name,nid,dst_name)
+            queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','f')" % (n_id,name,nid,dst_name)
             self.__cur.execute(queryIns)
             if dst_type in ('switch'):
                 queryIns = "INSERT INTO g_switches (n_id,name) VALUES ('%s','%s')" % (nid,dst_name)
@@ -1600,25 +1630,53 @@ class cacheDB(object):
                         self.deb(queryIns,2)
                         self.deb(e,2)
         self.commit()
+
     def addGSysEdge(self,src_sId,dst_sId):
-        query = "SELECT gn_id,gn_name FROM sg_nodes JOIN systems ON sg_nodes.s_id=systems.s_id WHERE systems.s_id='%s'" % src_sId
+        query = """SELECT gn_id,sg_id, gn_name FROM g_nodes JOIN systems
+                    ON g_nodes.s_id=systems.s_id WHERE systems.s_id='%s'""" % \
+                    src_sId
         res = self.selOne(query)
-        try: (src_gnId,src_gnName) = res
+        try:
+            (src_gnId, src_sgId, src_gnName) = res
         except:
             print query
             raise IOError
-        query = "SELECT gn_id,gn_name FROM sg_nodes JOIN systems ON sg_nodes.s_id=systems.s_id WHERE systems.s_id='%s'" % dst_sId
+        query = """SELECT gn_id, sg_id, gn_name FROM g_nodes JOIN systems
+                    ON g_nodes.s_id=systems.s_id WHERE systems.s_id='%s'""" % \
+                    dst_sId
         res = self.selOne(query)
-        try: (dst_gnId,dst_gnName) = res
+        try:
+            (dst_gnId, dst_sgId, dst_gnName) = res
         except:
             print query
             raise IOError
 
-
-        #  ge_id | ge_src_gnid | ge_src | ge_dst_gnid | ge_dst | ge_pos
-        queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (src_gnId,src_gnName,dst_gnId,dst_gnName)
+        if src_sgId == dst_sgId != 0:
+            query = """SELECT * FROM sg_edges
+                            WHERE sge_src_gnid='%s' AND sge_dst_gnid='%s'
+                            OR sge_src_gnid='%s' AND sge_dst_gnid='%s'""" % \
+                            (src_gnId, dst_gnId, dst_gnId, src_gnId)
+            res = self.sel(query)
+            if len(res)!=0:
+                return
+            queryIns = """INSERT INTO sg_edges VALUES
+                            (NULL,'%s', '%s','%s','%s','%s','f')""" % \
+                        (src_sgId, src_gnId, src_gnName, dst_gnId, dst_gnName)
+        else:
+            query = """SELECT * FROM g_edges
+                            WHERE ge_src_gnid='%s' AND ge_dst_gnid='%s'
+                            OR ge_src_gnid='%s' AND ge_dst_gnid='%s'""" % \
+                            (src_gnId, dst_gnId, dst_gnId, src_gnId)
+            res = self.sel(query)
+            if len(res)!=0:
+                return
+            queryIns = """INSERT INTO g_edges VALUES
+                            (NULL,'%s','%s','%s','%s','f')""" % \
+                            (src_gnId, src_gnName, dst_gnId, dst_gnName)
+            print queryIns
         self.__cur.execute(queryIns)
         self.commit()
+
     def addSysSgNodesAndEdges(self,item,sg_id):
         (n_id,n_guid,name,s_id,nt_id,in_topo,nt_name) = (item.n_id,item.n_guid,item.name,item.s_id,item.nt_id,item.IamIn,item.nt_name)
         n_ids = self.getChilds(item)
@@ -1631,17 +1689,18 @@ class cacheDB(object):
             if dst_type in ('switch','spine'):
                 raise IOError('What\'s this for...')
                 # Bei einem Switch legen wir eine g_edge an (Kante in keinem Subgraphen)
-                queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (n_id,name,dN_id,dst_name)
+                queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','f')" % (n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
                 if not in_sg=='t':
                     queryUp = "UPDATE nodes SET in_sg='t' WHERE n_id='%s'" % dN_id
                     self.__cur.execute(queryUp)
-            else:            
-                queryIns = "INSERT INTO sg_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
+            else:
+                queryIns = "INSERT INTO g_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
                 self.__cur.execute(queryIns)
-                queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','','f')" % (sg_id,n_id,name,dN_id,dst_name)
+                queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','f')" % (sg_id,n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
         self.commit()
+
     def addSgNodesAndEdges(self,item,sg_id):
         (n_id,n_guid,name,s_id,nt_id,in_topo,nt_name) = (item.n_id,item.n_guid,item.name,item.s_id,item.nt_id,item.IamIn,item.nt_name)
         n_ids = self.getChilds(item)
@@ -1649,21 +1708,23 @@ class cacheDB(object):
             query = "SELECT s_name,n_name,nt_name,in_topo,in_sg FROM systems NATURAL JOIN nodes NATURAL JOIN nodetypes WHERE n_id='%s'" % dN_id
             res = self.selOne(query)
             (dstS_name,dstN_name, dst_type,in_topo,in_sg) = res
-            if dstN_name=='None':   dst_name = dstS_name
-            else:                   dst_name = dstN_name
+            if dstN_name == 'None':
+                dst_name = dstS_name
+            else:
+                dst_name = dstN_name
             if dst_type in ('switch','spine'):
                 # Bei einem Switch legen wir eine g_edge an (Kante in keinem Subgraphen)
-                queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','','f')" % (n_id,name,dN_id,dst_name)
+                queryIns = "INSERT INTO g_edges VALUES (NULL,'%s','%s','%s','%s','f')" % (n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
                 if not in_sg=='t':
                     queryUp = "UPDATE nodes SET in_sg='t' WHERE n_id='%s'" % dN_id
                     self.__cur.execute(queryUp)
                     queryIns = "INSERT INTO g_switches (n_id,name) VALUES ('%s','%s')" % (dN_id,dst_name)
                     self.__cur.execute(queryIns)
-            else:            
-                queryIns = "INSERT INTO sg_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
+            else:
+                queryIns = "INSERT INTO g_nodes (sg_id,n_id,gn_name ) VALUES ('%s','%s','%s')" % (sg_id,dN_id,dst_name)
                 self.__cur.execute(queryIns)
-                queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','','f')" % (sg_id,n_id,name,dN_id,dst_name)
+                queryIns = "INSERT INTO sg_edges VALUES (NULL,'%s','%s','%s','%s','%s','f')" % (sg_id,n_id,name,dN_id,dst_name)
                 self.__cur.execute(queryIns)
         self.commit()
     def getGSwitches(self):
@@ -1738,28 +1799,32 @@ class cacheDB(object):
     def isSwitch(self,gn_id,gn_name):
         # If there is no HCA within the node_desc its a switch
         return not re.search("HCA",gn_name)
-    def sys2SgNode(self,system,sg_id=0):
-        query = "SELECT gn_id FROM sg_nodes WHERE s_id='%s'" % system.s_id
+
+    def sys2GNode(self, system, sg_id=0):
+        """ Creates node within g_nodes and returns id """
+        query = "SELECT gn_id FROM g_nodes WHERE s_id='%s'" % system.s_id
         res = self.selOne(query)
-        if res!=None:
+        if res != None:
             return res[0]
         else:
-            query = "INSERT INTO sg_nodes (sg_id,s_id,gn_name) VALUES ('%s','%s','%s')" % (sg_id,system.s_id,system.name)
+            query = "INSERT INTO g_nodes (sg_id,s_id,gn_name) VALUES"
+            query += " ('%s','%s','%s')" % (sg_id, system.s_id, system.name)
             self.ins(query)
-            query = "SELECT gn_id FROM sg_nodes WHERE s_id='%s'" % system.s_id
+            query = "SELECT gn_id FROM g_nodes WHERE s_id='%s'" % system.s_id
             gn_id = self.selOne(query)[0]
             return gn_id
-    def upsert_sgno(self,key,val,gn_id):
-        query = "SELECT sgno_id, sgno_val FROM sgn_options WHERE sgn_id='%s' AND sgno_key='%s'" % (gn_id,key)
+
+    def upsert_gno(self,key,val,gn_id):
+        query = "SELECT gno_id, gno_val FROM gn_options WHERE gn_id='%s' AND gno_key='%s'" % (gn_id,key)
         res = self.selOne(query)
         if res!=None and res[1]!=val:
-            query = "UPDATE sgn_options SET sgno_val='%s' WHERE sgno_id='%s'" % (val,res[0])
+            query = "UPDATE gn_options SET gno_val='%s' WHERE gno_id='%s'" % (val,res[0])
             self.ins(query)
         elif key=='shape':
-            query = "UPDATE sg_nodes SET gn_shape='%s' WHERE gn_id='%s'" % (val,gn_id)
+            query = "UPDATE g_nodes SET gn_shape='%s' WHERE gn_id='%s'" % (val,gn_id)
             self.ins(query)
         else:
-            query = """INSERT INTO sgn_options (sgn_id,sgno_key,sgno_val)
+            query = """INSERT INTO gn_options (gn_id,gno_key,gno_val)
                         VALUES ('%s', '%s', '%s')""" % (gn_id,key,val)
             self.ins(query)
     def getLinkPerf(self, src_name, dst_name):
@@ -1772,7 +1837,6 @@ class cacheDB(object):
         res = self.sel(query)
         if len(res)!=1:
             # FIXME: Multiple connections between nodes?!
-            raise IOError("Not sure if this works with multiple connections")
             pass
         for row in res:
             (src_pid, width, speed) = row
@@ -1793,80 +1857,32 @@ class topology(object):
         self.rDB = rDB
         self.opt = opt
         self.cfg = cfg
-    def deb(self,msg,deb):
-        if self.opt.dot and self.opt.debug>=deb:
+
+    def deb(self, msg, deb):
+        if self.opt.dot and self.opt.debug >= deb:
             print msg
+
     def eval(self):
         self.log.start()
         cDB = self.cDB
-        self.root = nodeNid(self.opt, cDB,self.cfg,None)
+        self.root = nodeNid(self.opt, cDB, self.cfg, None)
         # root ist bestimmt, nun schauen wir ob es gleichartige spines gibt in dem Chassis / System
         self.recursiv(self.root)
         self.log.end("evalTopo")
-    def recursiv_ALT(self,item):
-        self.deb("Gerade in recursiv als Elternteil: %s" % item,1)
-        cDB = self.cDB
-        # Wenn die Topologie mit Kreisen daherkommt (Zykel,Schleifen),
-        # dann kann der Binaerbaum-Ansatz nicht mehr gehalten werden
-        # Somit werden nur noch Endknoten geclustert.
-        # Das logische Custern von z.B. Fabricboards oder Chassis muss dann erfolgen.
-        
-        # n_ids der Kinder
-        child_nids = cDB.getChilds(item)
-        for child_nid in child_nids:
-            pass
-        
-        if item.nt_name in ('switch','root','spine'):
-            countChilds = cDB.countChilds(item)
-            #if countChilds==0 and not self.opt.all:
-            #    if self.opt.debug>=1: print "Switch '%s' hat keine Kinder, daher wird er nicht aufgenommen" % item.name
-            #    return
-            self.deb("Switch '%s' hat %s Kinder, daher wird er nicht aufgenommen" % (item.name,countChilds),1)
-            
-            ## TODO
-            # Wenn der Switch ein Chassis ist, dann wird ein stellvertreter-system erstellt und
-            
-            
-            if item.in_topo=='f':
-                # Wenn der Switch noch nicht in der Topologie ist,
-                # wird das komplette Verfahren durchgezogen und er
-                # bekommt seinen eigenen Rahmen (subgraph cluster_)
-                sg_id = cDB.createSubgraph(item.name,item.nt_name)
-                # Line-Knoten hinzufuegen
-                n = (item.n_id,item.name,item.nt_name)
-                cDB.addNode(sg_id,n,"\"box\"")
-                # Kinder+Links hinzufuegen
-                cDB.addSgNodesAndEdges(item,sg_id)
-            else:
-                self.deb("Switch '%s' ist schon in_topo und hat auch schon edge_eval....?" % (item.name),1)
-                # Hier gilt: in_topo AND NOT edge_eval
-                # Somit gibt es schon einen Subgraphen,
-                # der Knoten hat schon sein Cluster
-                ### !!!!
-                # Irgendwie kann dieser Status dann nicht eintreten...?!
-                #cDB.addSgNodesAndEdges(item)
-                pass
-        else:
-            print "Typ '%s' hat noch keinen Zweig in topology.recursiv()" % item.nt_name
 
-        ### Und nun noch alle neu hinzugekommenen Switches
-        switches = cDB.getGSwitches()
-        for row in switches:
-            (n_id, name) = row
-            switch = node(self.opt, cDB, self.cfg, n_id)
-            self.recursiv(switch)
-        return
-    def drawChassis(self,fd):
+    def drawChassis(self, fd):
         c_query = "SELECT c_id,c_name FROM chassis"
         c_res = self.cDB.sel(c_query)
         for c_row in c_res:
-            (c_id,c_name) = c_row
+            (c_id, c_name) = c_row
             # Erstelle sg_node der Chassis representiert
-            gn_id = self.cDB.addChassis(c_id,c_name)
+            gn_id = self.cDB.addChassis(c_id, c_name)
             # Male diesen Knoten, alle Kanten muessen dann auf diesen Knoten umgebogen werden...
-            self.drawNode(fd,gn_id)
-    def write(self,fd,line):
-        fd.write("%s%s\n" % ("\t"*self.tab,line))
+            self.drawNode(fd, gn_id)
+
+    def write(self, fd, line):
+        fd.write("%s%s\n" % ("\t" * self. tab, line))
+
     def fixPositions(self):
         self.log.start("fixPos")
         if self.opt.graphviz_cmd != "":
@@ -1876,11 +1892,11 @@ class topology(object):
             print out
             sys.exit(2)
         if 1:
-            fd = open("/tmp/out.dot","w")
+            fd = open("/tmp/out.dot", "w")
             fd.write(out)
             lines = out.split("\n")
         else:
-            fd = open("/tmp/out.dot","r")
+            fd = open("/tmp/out.dot", "r")
             lines = fd.readlines()
         fd.close()
         # Defaults
@@ -1892,14 +1908,18 @@ class topology(object):
             self.matchNode(line)
             self.matchEdge(line)
         self.log.end("fixPos")
-    def matchEdge(self,line):
+
+    def matchEdge(self, line):
+        """ We don't need this function anymore, because while create the topo
+        we assume that we don't get eyecandy-options. Maybe we should reconsider
+        this to implement different edge sizes """
+        return
         #s1c1 -> l1c1 [pos="712.01,738.06 677.54,649.48 550.75,323.71 519.36,243.03"];
-        r ='[ \t]+([a-zA-Z0-9]+) -> ([a-zA-Z0-9]+)[ \t]+\[(.+)\];'
-        m = re.search(r,line)
-        if m:
-            (src,dst) = (m.group(1),m.group(2))
-            opts = m.groups()[2:]
-            self.alterEdge(src,dst,opts[0])
+        reg = '[ \t]+([a-zA-Z0-9]+) -> ([a-zA-Z0-9]+)[ \t]+\[(.+)\];'
+        mat = re.search(r, line)
+        if mat:
+            (src, dst) = (mat.group(1), mat.group(2))
+            opts = mat.groups()[2:]
     def matchNode(self,line):
         r ='^[ \t]*([a-zA-Z0-9]+)[ \t]+\[(.+)\];'
         m = re.match(r,line)
@@ -1958,15 +1978,8 @@ class topology(object):
         query = "INSERT INTO sg_options VALUES (NULL,'%s','%s [%s=%s]')" % (sg_id,self.typ,opts[0],opts[1])
         try: self.cDB.ins(query)
         except sqlite3.IntegrityError, e: pass
-    def alterEdge(self,src,dst,opts):
-        pos =  opts.split("=")[1]
-        if self.sg_id!=0:
-            query = "UPDATE sg_edges SET sge_pos='%s' WHERE sge_src='%s' AND sge_dst='%s'" % (pos,src,dst)
-        else:
-            query = "UPDATE g_edges SET ge_pos='%s' WHERE ge_src='%s' AND ge_dst='%s'" % (pos,src,dst)
-        self.cDB.ins(query)
     def alterNode(self,node,opts):
-        query = "SELECT gn_id FROM sg_nodes WHERE gn_name='%s'" % node
+        query = "SELECT gn_id FROM g_nodes WHERE gn_name='%s'" % node
         res = self.cDB.selOne(query)
         if len(res)!=1:
             raise IOError("Node '%s' nicht vorhanden" % node)
@@ -1977,7 +1990,7 @@ class topology(object):
                 (k,v) = opt_dingens
             elif len(opt_dingens)>=3:
                 (k, v) = (opt_dingens[0], "=".join(tuple(opt_dingens[1:])))
-            self.cDB.upsert_sgno(k, v, gn_id)
+            self.cDB.upsert_gno(k, v, gn_id)
 
 
 class myTopo(topology):
@@ -1995,7 +2008,7 @@ class myTopo(topology):
         self.tab = 0
         self.write(fd, "digraph G { overlap=none;")
         # Set edges and nodes to be in the topology
-        query = "UPDATE sg_nodes SET in_topo='f'"
+        query = "UPDATE g_nodes SET in_topo='f'"
         res = cDB.ins(query)
         query = "UPDATE sg_edges SET in_topo='f'"
         res = cDB.ins(query)
@@ -2035,12 +2048,12 @@ class myTopo(topology):
             raise IOError
 
     def drawSgNodes(self, fd, sg_id):
-        query = """SELECT sg_id,sgn.c_id,sgn.s_id,sgn.n_id,
+        query = """SELECT sg_id, gn.c_id, gn.s_id, gn.n_id,
                     (SELECT state_name FROM states WHERE state_id=n_state_id)
                     AS n_status,
                     gn_id,gn_name,gn_shape
-                FROM sg_nodes sgn JOIN nodes n ON n.s_id=sgn.s_id
-                WHERE sg_id='%s' AND sgn.in_topo='f'""" % sg_id
+                FROM g_nodes gn JOIN nodes n ON n.s_id=gn.s_id
+                WHERE sg_id='%s' AND gn.in_topo='f'""" % sg_id
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
@@ -2054,24 +2067,22 @@ class myTopo(topology):
             item.setInTopo()
 
     def drawGNodes(self, fd):
-        print "## drawGNodes"
-        query = """SELECT sg_id, sgn.c_id, sgn.s_id, sgn.n_id,
+        query = """SELECT sg_id, gn.c_id, gn.s_id, gn.n_id,
                     (SELECT state_name FROM states WHERE state_id=n_state_id)
                     AS n_status,
                     gn_id,gn_name,gn_shape
-                FROM sg_nodes sgn JOIN nodes n ON n.s_id=sgn.s_id
-                WHERE sgn.in_topo='f'"""
+                FROM g_nodes gn JOIN nodes n ON n.s_id=gn.s_id
+                WHERE gn.in_topo='f'"""
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
-            print row
             item = nodeGnId(self.opt, self.cDB, self.rDB, self.cfg, gn_id)
             item.setNodeInfo(row, self.graph)
             if self.graph != None:
                 opts = item.getNodeOpts()
-            self.write(fd, "\"%s\" %s;" % (gn_name,opts))
+            self.write(fd, "\"%s\" %s;" % (gn_name, opts))
             item.setInTopo()
 
     def drawNode(self, fd, gn_id):
@@ -2079,22 +2090,22 @@ class myTopo(topology):
                     (SELECT state_name FROM states WHERE state_id=n.n_state_id)
                     AS n_status,
                     gn_id,gn_name,gn_shape
-                FROM sg_nodes sgn JOIN nodes n ON sgn.s_id=n.s_id
+                FROM g_nodes gn JOIN nodes n ON gn.s_id=n.s_id
                 WHERE gn_id='%s'""" % gn_id
         res = self.cDB.sel(query)
         for row in res:
             opts = ""
             (sg_id, c_id, s_id, n_id, n_status, \
              gn_id, gn_name, gn_shape) = row
-            item = nodeGnId(self.opt, self.cDB, self.cfg,gn_id)
-            item.setNodeInfo(self.rDB, row, self.graph)
+            item = nodeGnId(self.opt, self.cDB, self.rDB, self.cfg, gn_id)
+            item.setNodeInfo(row, self.graph)
             if self.graph != None:
-                opts = item.getNodeOpts(self.graph)
+                opts = item.getNodeOpts()
             self.write(fd, "\"%s\" %s;" % (gn_name,opts))
             item.setInTopo()
 
     def drawGEdges(self, fd):
-        query = "SELECT ge_src_gnid, ge_src, ge_dst_gnid, ge_dst, ge_pos "
+        query = "SELECT ge_src_gnid, ge_src, ge_dst_gnid, ge_dst "
         query += "FROM g_edges WHERE in_topo='f'"
         res = self.cDB.sel(query)
         rowS = set([])
@@ -2109,23 +2120,21 @@ class myTopo(topology):
             edge.setInTopo()
 
     def drawSgEdges(self, fd, sg_id):
-        sg_query = "SELECT gn_id,gn_name FROM sg_nodes WHERE sg_id='%s'" % sg_id
+        sg_query = "SELECT gn_id, gn_name FROM g_nodes WHERE sg_id='%s'" % sg_id
         sg_res = self.cDB.sel(sg_query)
         for sg_row in sg_res:
             (gn_id, gn_name) = sg_row
-            query = """SELECT sge_src_nid, sge_src,
-                              sge_dst_nid, sge_dst, sge_pos
-                       FROM sg_edges WHERE sge_src_nid='%s'
-                                    AND in_topo='f'""" % gn_id
+            query = "SELECT sge_src_gnid, sge_src, "
+            query += "sge_dst_gnid, sge_dst "
+            query += "FROM sg_edges WHERE sge_src_gnid='%s' " % gn_id
+            query += "AND in_topo='f'"
             res = self.cDB.sel(query)
             rowS = set([])
             # ugly hack to prevent multiple links being drawn multiple times
             for row in res:
                 rowS.add(row)
             for row in rowS:
-                (sge_src_gnid, sge_src, sge_dst_gnid, sge_dst, sge_pos) = row
-                if self.cDB.isSwitch(sge_dst_gnid, sge_dst):
-                    continue
+                (sge_src_gnid, sge_src, sge_dst_gnid, sge_dst) = row
                 edge = edgeClass(self.opt, self.cDB, self.cfg, self.log)
                 edge.setInfo(row, self.graph)
                 edge.setInTopo()
@@ -2168,34 +2177,44 @@ class Parameter(object):
         self.default()
 
         (self.options, args) = self.parser.parse_args()
- 
+
         # copy over all class.attributes
         self.__dict__ = self.options.__dict__
         self.args = args
+
     def default(self):
         # Default-Options
-        self.parser.add_option("-d",
-            action="count",
-            dest="debug",
+        self.parser.add_option("-d", dest="debug", action="count",
             help="increases debug [default:None, -d:1, -ddd: 3]")
-        self.parser.add_option("-C", dest="netcfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/netgraph.cfg", action = "store", help = "Network configfile (default: %default)")
-        self.parser.add_option("-t", dest="topocfg", default="/root/kniepch/IB_FlowAndCongestionControl/serverfiles/usr/local/nagios/etc/topology.cfg", action = "store", help = "Topology configfile (default: %default)")
-        self.parser.add_option("-c", dest="cfgfile", default="/root/QNIB/serverfiles/usr/local/etc/default.cfg", action = "store", help = "Configfile (default: %default)")
-        self.parser.add_option("-g", dest="graph", default="plain", action = "store", help = "Graph to create (default: %default)")
-        self.parser.add_option("--parse", dest="parse", default=False, action = "store_true", help = "Show parsing debug information")
-        self.parser.add_option("--circle", dest="circle",
-            default=False,
+        self.parser.add_option("-C", dest="netcfg",
+            default="/root/QNIB/serverfiles/usr/local/nagios/etc/netgraph.cfg",
+            action="store", help="Network configfile (default: %default)")
+        self.parser.add_option("-t", dest="topocfg",
+            default="/root/QNIB/serverfiles/usr/local/nagios/etc/topology.cfg",
+            action="store", help="Topology configfile (default: %default)")
+        self.parser.add_option("-c", dest="cfgfile",
+            default="/root/QNIB/serverfiles/usr/local/etc/default.cfg",
+            action="store", help="Configfile (default: %default)")
+        self.parser.add_option("-g", dest="graph", default="plain",
+            action="store", help="Graph to create (default: %default)")
+        self.parser.add_option("--parse", dest="parse", default=False,
+            action="store_true", help="Show parsing debug information")
+        self.parser.add_option("--circle", dest="circle", default=False,
             action="store_true", help="Show circle debug information")
-        self.parser.add_option("--links", dest="links",
-            default=False,
+        self.parser.add_option("--links", dest="links", default=False,
             action="store_true", help="Show link analysis debug information")
-        self.parser.add_option("--db",dest="db",default=False, action = "store_true", help = "Show database debug information")
-        self.parser.add_option("--dot",dest="dot",default=False, action = "store_true", help = "Show graphviz debug information")
+        self.parser.add_option("--db", dest="db", default=False,
+            action="store_true", help="Show database debug information")
+        self.parser.add_option("--dot", dest="dot", default=False,
+            action="store_true", help="Show graphviz debug information")
         self.parser.add_option("--loop", dest="loop", default=False,
-            action = "store_true", help = "Loop the script")
+            action="store_true", help="Loop the script")
+        self.parser.add_option("--graphviz-cmd", dest="graphviz_cmd",
+            default="twopi", action="store",
+            help="Graphviz cmd to layout graph (default: %default)")
         self.parser.add_option("--delay", dest="loop_delay", default=11,
-            action = "store",
-            help = "Delay in seconds if loop is set (default: %default)")
+            action="store",
+            help="Delay in seconds if loop is set (default: %default)")
     def check(self):
         pass
 

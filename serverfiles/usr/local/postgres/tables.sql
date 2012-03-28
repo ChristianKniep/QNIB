@@ -124,7 +124,6 @@ CREATE TABLE g_edges (
     ge_src varchar(32),
     ge_dst_gnid INTEGER,
     ge_dst varchar(32),
-    ge_pos varchar(96),
     in_topo boolean DEFAULT 'f'
     );
 CREATE TABLE sg_options (
@@ -132,7 +131,7 @@ CREATE TABLE sg_options (
     sg_id INTEGER,
     sgo varchar(255)
     );
-CREATE TABLE sg_nodes (
+CREATE TABLE g_nodes (
     gn_id SERIAL PRIMARY KEY,
     sg_id INTEGER REFERENCES subgraphs(sg_id) ON DELETE CASCADE, --Nodes are connected to subgraph
     s_id INTEGER,
@@ -142,12 +141,12 @@ CREATE TABLE sg_nodes (
     gn_shape varchar(64),
     in_topo boolean DEFAULT 'f'
     );
-CREATE TABLE sgn_options (
-    sgno_id SERIAL PRIMARY KEY,
-    sgn_id INTEGER,
-    sgno_key varchar(56),
-    sgno_val varchar(255),
-    CONSTRAINT doppelcheck UNIQUE (sgn_id,sgno_key)
+CREATE TABLE gn_options (
+    gno_id SERIAL PRIMARY KEY,
+    gn_id INTEGER,
+    gno_key varchar(56),
+    gno_val varchar(255),
+    CONSTRAINT doppelcheck UNIQUE (gn_id,gno_key)
     );
 CREATE TABLE sg_edges (
     sge_id SERIAL PRIMARY KEY,
@@ -156,7 +155,6 @@ CREATE TABLE sg_edges (
     sge_src varchar(32),
     sge_dst_gnid INTEGER,
     sge_dst varchar(32),
-    sge_pos varchar(96),
     in_topo boolean DEFAULT 'f'
     );
 -- Perf/Err

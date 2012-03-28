@@ -39,9 +39,12 @@ class graph(object):
         self.opt = options
         self.cDB = cDB
         self.links = set([])
+        self.links = set([])
+
     def deb(self,msg,deb=3):
         if self.opt.debug>=deb:
             print "graph> %s" % msg
+
     def evalSystems(self):
         seenSys = []
         systemsNext = []
@@ -50,7 +53,8 @@ class graph(object):
         systems = self.cDB.getSystems()
         changedSids = []
         while True:
-            if len(systems)==0: break
+            if len(systems) == 0:
+                break
             system = systems.pop()
 
             ## Wenn der Knoten ein Chassis-Knoten ist, dann...
@@ -85,71 +89,82 @@ class graph(object):
                 systemsNext.append(system)
 
         while True:
-            if len(systemsNext)==0 and len(roots)==0 and len(switches)==0: break
-            if len(roots)!=0:
+            if len(systemsNext) == 0 and len(roots) == 0 and len(switches) == 0:
+                break
+            if len(roots) != 0:
                 system = roots.pop()
-                self.deb("Poppe Root: %s" % system,2)
-            elif len(switches)!=0:
+                self.deb("Poppe Root: %s" % system, 2)
+            elif len(switches) != 0:
                 system = switches.pop()
-                self.deb("Poppe Switch: %s" % system,2)
+                self.deb("Poppe Switch: %s" % system, 2)
             else:
                 system = systemsNext.pop()
-            #system.alterEdgesSid(changedSids)
-            if system.nt_name=='switch' and self.cDB.isEdgeSwitch(system.s_id):
+            if system.nt_name == 'switch' and self.cDB.isEdgeSwitch(system.s_id):
+                """ If we are an edge switch we should be clustered to keep all
+                    the nodes at one place """
+                system.isSubgraph = True
                 self.deb("## Edge: %s | %s" % (system, str(self.cDB.isEdgeSwitch(system.s_id))), 1)
                 sg_id = self.cDB.addCluster(system.name)
-                gn_id = self.cDB.sys2SgNode(system,sg_id)
+                gn_id = self.cDB.sys2GNode(system, sg_id)
                 childs = self.cDB.getSysChilds(system.s_id)
                 for child in childs:
-                    if child.s_id == system.s_id: continue
-                    if not child.isSwitch(): 
+                    if child.s_id == system.s_id:
+                        continue
+                    if not child.isSwitch():
                         try:
                             systemsNext.remove(child)
-                        except ValueError,e:
-                            print """ Child '%s' von System '%s' nicht in Liste der systeme... Juckt mich das? """ % (child.name,system.name)
+                        except ValueError, e:
+                            print """ Child '%s' von System '%s' nicht in Liste
+                            der systeme... Juckt mich das? """ % \
+                            (child.name, system.name)
                             print "Ich glaube ja! ENDE!"
                             sys.exit()
-                        self.deb("""## Switch '%s' hat Child: %s""" % (system.name, child.name),1)
-                        gn_id = self.cDB.sys2SgNode(child,sg_id)
+                        self.deb("""## Switch '%s' hat Child: %s""" % \
+                                 (system.name, child.name), 1)
+                        gn_id = self.cDB.sys2GNode(child, sg_id)
                     elif not self.cDB.isEdgeSwitch(child.s_id):
                         # Ja, was machen wir da?
-                        self.deb("## Kein Edge: %s" % child,1)
-                        gn_id = self.cDB.sys2SgNode(child)
+                        self.deb("## Kein Edge: %s" % child, 1)
+                        gn_id = self.cDB.sys2GNode(child)
             else:
                 """ Es handelt sich nicht um ein geclusterten Knoten """
-                self.deb("## Child: %s"%system,1)
-                gn_id = self.cDB.sys2SgNode(system)
+                self.deb("## Child: %s" % system, 1)
+                gn_id = self.cDB.sys2GNode(system)
             for edge in system.edges:
                 self.links.add(edge)
         for link in self.links:
             link.setSids(changedSids)
-            try:
-                self.cDB.addGSysEdge(link.src_sId,link.dst_sId)
-            except:
-                print link, changedSids
-                raise IOError
+            #try:
+            self.cDB.addGSysEdge(link.src_sId, link. dst_sId)
+            #except:
+            #    print link, changedSids
+            #    raise IOError
+
     def addNode(self, node):
         pass
 
+
 class graphEdge(object):
-    def __init__(self,cDB, l_id, s_p_lid, s_p_id, s_p_int, s_n_id, circle, d_n_id, d_p_int, d_p_id, d_p_lid):
-        self.cDB    = cDB
-        self.l_id   = l_id
-        self.s_p_lid   = s_p_lid
-        self.s_p_id  = s_p_id
-        self.s_p_int  = s_p_int
-        self.s_n_id   = s_n_id
+    def __init__(self, cDB, l_id, s_p_lid, s_p_id, s_p_int, s_n_id,
+                 circle, d_n_id, d_p_int, d_p_id, d_p_lid):
+        self.cDB = cDB
+        self.l_id = l_id
+        self.s_p_lid = s_p_lid
+        self.s_p_id = s_p_id
+        self.s_p_int = s_p_int
+        self.s_n_id = s_n_id
         self.circle = circle
-        self.d_n_id   = d_n_id
-        self.d_p_int  = d_p_int
-        self.d_p_id  = d_p_id
-        self.d_p_lid   = d_p_lid
+        self.d_n_id = d_n_id
+        self.d_p_int = d_p_int
+        self.d_p_id = d_p_id
+        self.d_p_lid = d_p_lid
         query = "SELECT DISTINCT s_id FROM systems NATURAL JOIN nodes WHERE n_id='%s'" % s_n_id
         res = self.cDB.selOne(query)
         self.src_sId = res[0]
         query = "SELECT DISTINCT s_id FROM systems NATURAL JOIN nodes WHERE n_id='%s'" % d_n_id
         res = self.cDB.selOne(query)
         self.dst_sId = res[0]
+
     def setGnId(self,gn_id):
         self.gn_id  = gn_id
     def __eq__(self, other):
@@ -175,80 +190,99 @@ class graphEdge(object):
             acc.add(row[0])
         return len(acc)==2
 
+
 class graphSys(object):
     def __init__(self, name):
         self.name = name
-        self.s_id       = 0
-        self.c_id       = 0
-        self.s_guid     = 0
-        self.cir_cnt    = 0
-        self.sw_cnt     = 0
-        self.extSw_cnt  = 0
-        self.comp_cnt   = 0
-        self.edges      = set([])
-        self.backSet    = False
+        self.s_id = 0
+        self.c_id = 0
+        self.s_guid = 0
+        self.cir_cnt = 0
+        self.sw_cnt = 0
+        self.extSw_cnt = 0
+        self.comp_cnt = 0
+        self.edges = set([])
+        self.backSet = False
+        self.isSubgraph = False
+
     def __eq__(self, other):
         return self.s_id == other.s_id
+
     def setNtName(self, nt_name):
-        self.nt_name       = nt_name
+        self.nt_name = nt_name
+
     def setOpts(self, s_id, s_guid):
-        self.s_id       = s_id
-        self.s_guid     = s_guid
-    def drainSys(self,victim):
+        self.s_id = s_id
+        self.s_guid = s_guid
+
+    def drainSys(self, victim):
         acc = []
         for edge in victim.edges:
             if edge.isExternal():
-                edge.setSid(victim.s_id,self.s_id)
-                acc.append((victim.s_id,self.s_id))
+                edge.setSid(victim.s_id, self.s_id)
+                acc.append((victim.s_id, self.s_id))
                 self.edges.add(edge)
-        self.extSw_cnt  += victim.extSw_cnt
-        self.sw_cnt     += victim.extSw_cnt
-        self.cir_cnt    += victim.cir_cnt
+        self.extSw_cnt += victim.extSw_cnt
+        self.sw_cnt += victim.extSw_cnt
+        self.cir_cnt += victim.cir_cnt
         return acc
-    def alterEdgesSid(self,ch_sids):
+
+    def alterEdgesSid(self, ch_sids):
         for edge in self.edges:
             edge.setSids(ch_sids)
+
     def setChassisId(self, c_id):
-        if c_id!='None':
-            self.c_id       = c_id
+        if c_id != 'None':
+            self.c_id = c_id
+
     def setLinkList(self, back):
         if self.backSet: return
-        self.backSet    = True
+        self.backSet = True
         ## Wenn ich Src der Links bin
-        if self.s_id==back['s_s_id']:
+        if self.s_id == back['s_s_id']:
             #...dann schnapp ich mir die Prefixe s_
-            for key,val in back.items():
+            for key, val in back.items():
                 m = re.match("s_(.*)",key)
                 if m:
                     self.__dict__[m.group(1)] = val
-        elif self.s_id==back['d_s_id']:
+        elif self.s_id == back['d_s_id']:
             #...andernfalls d_
-            for key,val in back.items():
+            for key, val in back.items():
                 m = re.match("d_(.*)",key)
                 if m:
                     self.__dict__[m.group(1)] = val
+
     def setCnts(self, cir_cnt, sw_cnt, extSw_cnt, comp_cnt):
         self.cir_cnt = cir_cnt
-        self.sw_cnt  = sw_cnt
+        self.sw_cnt = sw_cnt
         self.extSw_cnt = extSw_cnt
         self.comp_cnt = comp_cnt
+
     def addEdge(self, edge):
         self.edges.add(edge)
+
     def __str__(self):
         res = "%-20s (Cir:%-2s|cId:%s|sId:%-4s|Sw:%-2s|eSw:%-2s|Comp:%-2s)" % (self.name, self.cir_cnt, self.c_id,self.s_id, self.sw_cnt, self.extSw_cnt, self.comp_cnt)
         return res
+
     def createNode(self):
         self.node = pydot.Node(self.name, label=self.name)
-    def isChassis(self):
-        return self.c_id!=0
-    def isSwitch(self):
-        return self.nt_name=="switch"
 
-def eval_topo(options,db,cfg,log):
-    if False:
-        try: os.remove("/tmp/topology.db")
-        except: pass
-        cDB = libTopology.cacheDB(options, cfg, db, log,"/tmp/topology.db")
+    def isChassis(self):
+        return self.c_id != 0
+
+    def isSwitch(self):
+        return self.nt_name == "switch"
+
+
+def eval_topo(options, db, cfg, log):
+    #if False:
+    if True:
+        try:
+            os.remove("/tmp/topology.db")
+        except:
+            pass
+        cDB = libTopology.cacheDB(options, cfg, db, log, "/tmp/topology.db")
     else:
         cDB = libTopology.cacheDB(options, cfg, db, log)
 
@@ -263,7 +297,7 @@ def eval_topo(options,db,cfg,log):
 
     topo = libTopology.myTopo(rDB, cDB, options, cfg, log)
     topo.create()
-    #topo.fixPositions()
+    topo.fixPositions()
 
     cDB.bkpDat()
 
