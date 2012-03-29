@@ -126,7 +126,7 @@ class parseObj(object):
                         c = 1
                         for x in regname:
                             if x == "X":
-                                res += m.group(c)
+                                res += mat.group(c)
                                 c += 1
                             elif x == "%":
                                 res += self.lid
@@ -136,7 +136,7 @@ class parseObj(object):
                                 res += x
                         self.name = res
                     if self.hostPat[reg].has_key('type'):
-                        self.type = self.hostPat[r]['type']
+                        self.type = self.hostPat[reg]['type']
                         if type(self) is parseNode:
                             self.nt_id = self.rDB.getIns_ID('nodetypes', "nt_name='%s'" % self.type, ['nt_name'], [self.type], self.opt.debug)
                     if self.hostPat[reg].has_key('name'):

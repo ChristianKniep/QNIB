@@ -117,7 +117,7 @@ class swPort(object):
     def deb(self, lids, msg, deb=0):
         if self.opt.lids and hasItems(lids, self.opt.lids):
             print msg
-        elif self.opt.debug >= deb:
+        elif self.opt.parse and self.opt.debug >= deb:
             print msg
 
     def matching(self):
@@ -141,7 +141,7 @@ class swPort(object):
         self.deb(s_lids,
             "Matche Switch-Port: p:%s dguid:%s dp:%s dpguid:%s dn:%s dl:%s w:%s s:%s" % \
             (self.port, self.dguid, self.dport, self.dportguid,
-             self.dname, self.dlid, self.width, self.speed), 1)
+             self.dname, self.dlid, self.width, self.speed), 2)
         node = self.opt.nodeGuids[self.dguid]
         dst = node.createPort(self.dport, self.dportguid, self.dlid)
         self.deb(s_lids, "### %s" % node.__str__(), 1)
@@ -723,11 +723,16 @@ def main():
 
         (trap_dict, trap_list) = db.getTraps()
         chk = checks(db, options, cfg, log)
-        log.debug("%s Traps detected..." % len(trap_dict), 1)
+        log.debug("%s Traps detected..." % len(trap_dict), 2)
+        log.debug("ibnetdiscover", 0)
         chk.ibnetdiscover()
+        log.debug("evalSwPorts", 0)
         chk.evalSwPorts(cfg)
+        log.debug("evalHistory", 0)
         chk.evalHistory()
-        chk.evalMatches()
+        #log.debug("evalMatches", 0)
+        #chk.evalMatches()
+        #log.debug("/evalMatches", 0)
         chk.addPerf('countInsLink', db.countInsLink)
         if len(trap_dict) > 0 or options.force_uptopo:
             # Should we update the topology?
