@@ -70,6 +70,96 @@ class dbCon(object):
         if self.db: self.db.deb(query,debug)
         self.__cur.execute(query)
         self.commit()
+
+    def getLinkList(self,s_id=False):
+        """ List all Links within the fabric """
+        query = """SELECT   l.l_id,
+                            p1.p_lid,
+                            p1.p_id,
+                            p1.p_int,
+                            n1.n_id,
+                            n1.n_name,
+                            n1.n_guid,
+                            n1.n_state_id,
+                            nt1.nt_name,
+                            s1.s_name,
+                            s1.s_guid,
+                            s1.s_id,
+                            c1.c_name,
+                            s1.c_id,
+                            l.circle,
+                            s2.c_id,
+                            c2.c_name,
+                            s2.s_id,
+                            s2.s_guid,
+                            s2.s_name,
+                            nt2.nt_name,
+                            n2.n_state_id,
+                            n2.n_guid,
+                            n2.n_name,
+                            n2.n_id,
+                            p2.p_int,
+                            p2.p_id,
+                            p2.p_lid
+                        FROM links l,ports p1,ports p2,nodes n1,nodes n2,
+                             nodetypes nt1, nodetypes nt2, systems s1,
+                             systems s2, chassis c1, chassis c2
+                        WHERE   l.src   = p1.p_id AND
+                                l.dst   = p2.p_id AND
+                                p1.n_id = n1.n_id AND
+                                p2.n_id = n2.n_id AND
+                                n1.nt_id= nt1.nt_id AND
+                                n2.nt_id= nt2.nt_id AND
+                                n1.s_id = s1.s_id AND
+                                n2.s_id = s2.s_id AND
+                                s1.c_id = c1.c_id AND
+                                s2.c_id = c2.c_id"""
+        if s_id:
+            query += "AND (s1.s_id='%s' OR s2.s_id='%s')" % (s_id, s_id)
+        return self.getLinkListRes(query)
+
+    def getLinkListRes(self, query):
+        """ Creates dictonary out of query """
+        res = self.sel(query)
+        back = []
+        for row in res:
+            acc = {}
+            (l_id, s_lid, s_p_id, s_port, s_nid, s_nname, s_nguid, s_n_state_id,
+             s_ntname, s_sname, s_sguid, s_sid, s_cname, s_cid, circle, d_cid, \
+             d_cname, d_sid, d_sguid, d_sname, d_ntname, d_n_state_id, \
+             d_nguid, d_nname, d_nid, d_port, d_p_id, d_lid) = row
+
+            acc['l_id'] = l_id
+            acc['s_p_lid'] = s_lid
+            acc['s_p_id'] = s_p_id
+            acc['s_p_int'] = s_port
+            acc['s_n_id'] = s_nid
+            acc['s_n_name'] = s_nname
+            acc['s_n_guid'] = s_nguid
+            acc['s_n_state_id'] = s_n_state_id
+            acc['s_nt_name'] = s_ntname
+            acc['s_s_name'] = s_sname
+            acc['s_c_name'] = s_cname
+            acc['s_s_id'] = s_sid
+            acc['s_c_id'] = s_cid
+            acc['s_s_guid'] = s_sguid
+            acc['circle'] = circle
+            acc['d_s_guid'] = d_sguid
+            acc['d_c_id'] = d_cid
+            acc['d_s_id'] = d_sid
+            acc['d_c_name'] = d_cname
+            acc['d_s_name'] = d_sname
+            acc['d_nt_name'] = d_ntname
+            acc['d_n_state_id'] = d_n_state_id
+            acc['d_n_guid'] = d_nguid
+            acc['d_n_name'] = d_nname
+            acc['d_n_id'] = d_nid
+            acc['d_p_int'] = d_port
+            acc['d_p_id'] = d_p_id
+            acc['d_p_lid'] = d_lid
+            back.append(acc)
+        return back
+
     def sel(self,query,debug=3):
         self.querys += 1
         if self.db: self.db.deb(query,debug)
@@ -77,26 +167,36 @@ class dbCon(object):
         self.__cur.execute(query)
         self.commit()
         return self.__cur.fetchall()
+
     def selOne(self,query,debug=3):
         self.querys += 1
         if self.db: self.db.deb(query,debug)
         self.__cur.execute(query)
         return self.__cur.fetchone()
+
     def getPID(self,node,pnr):
         query = "SELECT p_id FROM ports NATURAL JOIN nodes WHERE n_id='%s' AND p_int='%s'" % (node.n_id,pnr)
         res = self.sel(query)
         if len(res)==1: return res[0][0]
         raise IOError("No pid found")
+
     def getSystems(self):
-        query = """SELECT   DISTINCT s.s_id,s.c_id,s.s_guid,s.s_name,n.nt_id,
-                            (SELECT SUM(cir_cnt) FROM nodes WHERE s_id=s.s_id) AS cir_cnt,
-                            (SELECT SUM(sw_cnt) FROM nodes WHERE s_id=s.s_id) AS sw_cnt,
-                            (SELECT SUM(extSw_cnt) FROM nodes WHERE s_id=s.s_id) AS extSw_cnt,
-                            (SELECT SUM(comp_cnt) FROM nodes WHERE s_id=s.s_id) AS comp_cnt
-                        FROM systems s NATURAL JOIN nodes n
-                        WHERE s_rev='0'
-                        ORDER BY cir_cnt, extSw_cnt DESC;"""
+        """ gets all nodes out of the system """
+        query = """SELECT   n1.n_id,
+                            n1.n_name,
+                            nt1.nt_name,
+                            s1.s_name,
+                            s1.s_guid,
+                            s1.s_id,
+                            c1.c_name,
+                            s1.c_id
+                        FROM nodes n1, nodetypes nt1,
+                             systems s1, chassis c1
+                        WHERE   n1.nt_id=nt1.nt_id AND
+                                n1.s_id=s1.s_id AND
+                                s1.c_id=c1.c_id"""
         res = self.sel(query)
+        return res
     def getRows(self,table,query,debug=3):
         try:
             self.querys += 1
