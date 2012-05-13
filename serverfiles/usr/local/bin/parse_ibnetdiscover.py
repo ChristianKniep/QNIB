@@ -25,18 +25,25 @@ import pgdb
 import datetime
 import time
 
-sys.path.append('/root/QNIB/serverfiles/usr/local/lib/')
+sys.path.append('/Users/kniepbert/QNIB/serverfiles/usr/local/lib/')
+sys.path.append('/Users/kniepbert/Documents/QNIB/serverfiles/usr/local/lib/')
 import dbCon
 import libTopology
+import qnib2networkx
 
 
 class Parameter(object):
     def __init__(self):
         # Parameterhandling
-        usageStr = "parse_ibnetdiscover [options]"
-        self.parser = OptionParser(usage=usageStr)
+        usage_str = "parse_ibnetdiscover [options]"
+        self.parser = OptionParser(usage=usage_str)
         self.default()
         self.extra()
+        self.debug = 0
+        self.lids = ""
+        self.file = ""
+        self.cfgfile = ""
+        self.logfile = ""
         (self.options, args) = self.parser.parse_args()
 
         # copy over all class.attributes
@@ -44,11 +51,14 @@ class Parameter(object):
         self.args = args
 
     def default(self):
-        # Default-Options
+        """ Default-Options """
         self.parser.add_option("-d", action="count", dest="debug",
             help="increases debug [default:None, -d:1, -ddd: 3]")
         self.parser.add_option("-f", dest="file", default="", action="store",
             help="file which contains the ibnetdiscover-output")
+        self.parser.add_option("--logfile", dest="logfile",
+                default="/var/log/parse_ibnetdiscover.log", action="store",
+                help="file which contains the ibnetdiscover-output")
         self.parser.add_option("-L", dest="lids", default=False, action="store",
             help="lid to debug (all other debug information will be supressed)")
         self.parser.add_option("--check-traps", dest="check_traps",
@@ -84,27 +94,29 @@ class Parameter(object):
             help="Force update of topology")
 
     def extra(self):
+        """ optional options """
         pass
 
     def check(self):
+        """ checking plausiblity """
         if self.debug == None:
             self.debug = 0
         if self.lids:
             lids = self.lids.split(",")
             self.lids = set(lids)
-        self.nodeGuids = {}
+        self.node_guids = {}
 
 
-def hasItems(l1, l2):
-    #print l1,l2
-    for l in l1:
-        check = l in l2
+def has_items(l_1, l_2):
+    #print l_1,l_2
+    for l in l_1:
+        check = l in l_2
         if check:
             return True
     return False
 
 
-class swPort(object):
+class SWport(object):
     def __init__(self, opt, switch, line, match):
         self.line = line
         self.opt = opt
@@ -113,63 +125,78 @@ class swPort(object):
         self.dportguid = ''
         self.ext_port = False
         self.dext_port = False
+        self.port = None
+        self.type = None
+        self.dguid = None
+        self.dport = None
+        self.dportguid = None
+        self.dname = None
+        self.dlid = None
+        self.width = None
+        self.speed = None
 
     def deb(self, lids, msg, deb=0):
-        if self.opt.lids and hasItems(lids, self.opt.lids):
+        """ prints debug message """
+        if self.opt.lids and has_items(lids, self.opt.lids):
             print msg
         elif self.opt.parse and self.opt.debug >= deb:
             print msg
 
     def matching(self):
+        """ extract matching groups """
         (self.port, self.type, self.dguid, self.dport, self.dportguid,
          self.dname, self.dlid, self.width, self.speed) = self.match.groups()
 
     def eval(self, db, cfg):
+        """ evaluates input """
         self.matching()
         # Meine Switchports zuerst
         switch = self.switch
         src = switch.createPort(self.port, '', switch.lid)
 
-        pm = re.search("([a-z0-9]+)", self.dportguid, re.I)
+        mat = re.search("([a-z0-9]+)", self.dportguid, re.I)
         # TODO: Muss ich hier unterscheiden? Hoffe nicht.... :)
-        if pm:
-            self.dportguid = pm.group(1)
+        if mat:
+            self.dportguid = mat.group(1)
         else:
             self.dportguid = ''
         s_lids = switch.getLids()
         s_lids.add(self.dlid)
-        self.deb(s_lids,
-            "Matche Switch-Port: p:%s dguid:%s dp:%s dpguid:%s dn:%s dl:%s w:%s s:%s" % \
-            (self.port, self.dguid, self.dport, self.dportguid,
-             self.dname, self.dlid, self.width, self.speed), 2)
-        node = self.opt.nodeGuids[self.dguid]
+        msg = "Matche Switch-Port: p:%s dguid:%s" % (self.port, self.dguid)
+        msg += "dp:%s dpguid:%s dn:%s dl:%s w:%s s:%s" % \
+            (self.dport, self.dportguid, self.dname,
+             self.dlid, self.width, self.speed)
+        self.deb(s_lids, msg, 2)
+        node = self.opt.node_guids[self.dguid]
         dst = node.createPort(self.dport, self.dportguid, self.dlid)
         self.deb(s_lids, "### %s" % node.__str__(), 1)
-        linkCandidate = libTopology.parseLink(db, self.opt, cfg)
+        link_candidate = libTopology.parseLink(db, self.opt, cfg)
         l_id = db.insLink(src, dst, self.width, self.speed)
-        linkCandidate.setLinkID(l_id)
+        link_candidate.setLinkID(l_id)
         node.updateDB()
         # Link-Kandidate
-        # setOpts gibt den Kandidaten zurück, wenn er nicht existiert, existenten link sonst
-        link = linkCandidate.setOpts(self.switch, self.port, node, self.dport)
-        self.deb(self.switch.getLids(), "An Switch %s> %s" % (self.switch.__str__(), link), 2)
+        # setOpts gibt den Kandidaten zurück,
+        # wenn er nicht existiert, existenten link sonst
+        link = link_candidate.setOpts(self.switch, self.port, node, self.dport)
+        self.deb(self.switch.getLids(), "An Switch %s> %s" % \
+                 (self.switch.__str__(), link), 2)
 
 
-class swPortExt(swPort):
+class SwPortExt(SWport):
     def matching(self):
         (self.port, self.ext_port, self.type, self.dguid, self.dport,
          self.dportguid, self.dname, self.dlid, self.width,
          self.speed) = self.match.groups()
 
 
-class swPortDExt(swPort):
+class SwPortDExt(SWport):
     """ SourcePort is not modular - DstPort is """
     def matching(self):
         (self.port, self.type, self.dguid, self.dport, self.dext_port,
          self.dname, self.dlid, self.width, self.speed) = self.match.groups()
 
 
-class swPortExtExt(swPort):
+class SwPortExtExt(SWport):
     def matching(self):
         (self.port, self.ext_port, self.type, self.dguid, self.dport,
          self.dext_port, self.dname, self.dlid, self.width,
@@ -183,7 +210,7 @@ class checks(object):
         self.opt = options
         self.log = log
         self.log.start("create")
-        self.log_file = "/var/log/parse_ibnetdiscover.log"
+        self.log_file = self.opt.logfile
         self.retEC = 0
         self.start = int(datetime.datetime.now().strftime("%s"))
         self.stateIds = self.db.getStatesId()
@@ -196,6 +223,7 @@ class checks(object):
         self.chassisNames = cfg.get('chassis')
         self.sysGuids = {}
         self.swPorts = []
+        self.sysimgguid = None
         self.cNr = None
 
     def evalSwPorts(self, cfg):
@@ -218,16 +246,14 @@ class checks(object):
                 self.retEC = 2
             lines = out.split("\n")
         else:
-            ibfile = "/root/kniepch/IB_FlowAndCongestionControl/serverfiles/%s" % self.opt.file
-            ibfile = "%s" % self.opt.file
-            fd = open(ibfile, "r")
-            lines = fd.readlines()
-            fd.close()
-        bool = False
-        self.sysimgguid = None
-        cId = None
+            fdesc = open(self.opt.file, "r")
+            lines = fdesc.readlines()
+            fdesc.close()
+        my_bool = False
+        c_id = None
         # Wir muessen erstmal alle Systems und Nodes sichten, bevor wir uns an die Links machen
         for line in lines:
+            print line
             if self.matchContinue(line):
                 continue
 
@@ -243,28 +269,25 @@ class checks(object):
                     self.deb(set([slid, dlid]), "Matche %s-Hostport: " % \
                              (self.sysimgguid, line), "p", 3)
                     db.updatePort(nId, port, dport, slid, dlid, width, speed)
-                    bool = False
+                    my_bool = False
                     continue
 
             # Ich bin ein Chassismodul, da gibt es noch sowas wie [ext X]
             # [15][ext 15]    "S-0008f105002013b2"[32]                # "Voltaire 4036 # sw36" lid 419 4xDDR
             r = "^\[(\d+)\]\[ext (\d+)\].*\"[SH]-[0]*([a-z0-9]+)\"\[(\d+)\].*lid[ \t](\d+) (\d+)x([SDQ]DR)"
             m = re.match(r, line)
-            if m and self.sysimgguid and cId:
+            if m and self.sysimgguid and c_id:
                 # Port gefunden
                 (port, extport, guid, dport, dlid, width, speed) = m.groups()
                 self.deb(set([dlid]), "Matche %s-Chassisport %s: " % \
-                         (cId, port), "p", 1)
+                         (c_id, port), "p", 1)
                 db.updateChassisPort(nId, port, dport,
                                      slid, dlid, width, speed, extport)
                 continue
-            # Chassismodul mit Knoten an anderer Seite
-            # [14][ext 2]     "H-003048c1b2300000"[1](3048c1b2300001)                 # "harper132 HCA-1" lid 865 4xDDR
-
             # Reset von allen Board-Spezifika
-            r = "^vendid.*"
-            m = re.match(r, line)
-            if m:
+            reg = "^vendid.*"
+            mat = re.match(reg, line)
+            if mat:
                 chip = None
                 lb = None
                 fb = None
@@ -360,7 +383,7 @@ class checks(object):
             # Port gefunden
             #(self.port,self.type,self.dguid,self.dport,self.dportguid,
             #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            self.swPorts.append(swPort(self.opt, self.switch, line, mat))
+            self.swPorts.append(SWport(self.opt, self.switch, line, mat))
             return True
         return False
 
@@ -372,7 +395,7 @@ class checks(object):
             if guid and re.search(guid, line):
                 print "SwExt -> got it"
             # Port gefunden
-            self.swPorts.append(swPortExt(self.opt, self.switch, line, m))
+            self.swPorts.append(SwPortExt(self.opt, self.switch, line, m))
             return True
         return False
 
@@ -387,7 +410,7 @@ class checks(object):
             # Port gefunden
             #(self.port,self.type,self.dguid,self.dport,self.dportguid,
             #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            self.swPorts.append(swPortDExt(self.opt, self.switch, line, m))
+            self.swPorts.append(SwPortDExt(self.opt, self.switch, line, m))
             return True
         return False
 
@@ -404,7 +427,7 @@ class checks(object):
             if guid and re.search(guid, line):
                 print 'SwExtExt -> got it'
             # Port gefunden
-            self.swPorts.append(swPortExtExt(self.opt, self.switch, line, mat))
+            self.swPorts.append(SwPortExtExt(self.opt, self.switch, line, mat))
             return True
         return False
 
@@ -414,11 +437,11 @@ class checks(object):
         mat = re.match(reg, line)
         if mat:
             (guid, name) = mat.groups()
-            if self.opt.nodeGuids.has_key(guid):
-                node = self.opt.nodeGuids[guid]
+            if self.opt.node_guids.has_key(guid):
+                node = self.opt.node_guids[guid]
             else:
                 node = libTopology.parseNode(self.db, self.opt, self.cfg,
-                                             self.opt.nodeGuids)
+                                             self.opt.node_guids)
             node.setHost()
             node.setSys(self.sys)
             node.setName(name)
@@ -457,14 +480,14 @@ class checks(object):
         m = re.match(reg, line)
         if  m:
             (guid, name, lid) = m.groups()
-            if self.opt.nodeGuids.has_key(guid):
+            if self.opt.node_guids.has_key(guid):
                 self.deb(set([lid, ]),
                     "Switch '%s (guid:%s / lid:%s)' schon drin?" % \
                     (name, guid, lid), 'p', 0)
-                switch = self.opt.nodeGuids[guid]
+                switch = self.opt.node_guids[guid]
             else:
                 switch = libTopology.parseNode(self.db, self.opt, self.cfg,
-                                               self.opt.nodeGuids)
+                                               self.opt.node_guids)
                 switch.setSys(self.sys)
                 switch.setSwitch()
                 switch.setLid(lid)
@@ -484,11 +507,11 @@ class checks(object):
         # Wenn ein Kreisknoten im Pfad ist (path.circle),
         # dann reicht ein weiterer Kreisknoten
         # um den Pfad als Kreis zu markieren
-        #print self.opt.nodeGuids.keys()
+        #print self.opt.node_guids.keys()
 
         self.path = {}
         self.depth = 0
-        for startSw in self.opt.nodeGuids.values():
+        for startSw in self.opt.node_guids.values():
             if type(startSw) is libTopology.parseNode and startSw.isSwitch():
                 self.deb(startSw.getLids(), "Starte: %s" % (startSw), 'l', 1)
                 self.actP = libTopology.thePath(self.opt)
@@ -517,7 +540,8 @@ class checks(object):
                 print query
                 print "DB emtpy! srsly?"
                 sys.exit()
-            (s_id, s_name, s_state_id, n_id, n_name, n_state_id, p_id, port, p_state_id) = row
+            (s_id, s_name, s_state_id, n_id, n_name,
+             n_state_id, p_id, port, p_state_id) = row
             p_status = self.stateIds[p_state_id]
             n_status = self.stateIds[n_state_id]
             s_status = self.stateIds[s_state_id]
@@ -615,12 +639,14 @@ class checks(object):
                 self.deb(s_lids, "%-10s S %-10s über %s >> %s" % \
                          ("#" * self.depth, child, links, self.actP), 'l', 2)
                 self.actP.addLinks(links)
-                # FIXME: Damit script mehrfach aufgerufen werden kann, habe ich die Zeile auskommentiert.
+                """ FIXME: Damit script mehrfach aufgerufen werden kann,
+                           habe ich die Zeile auskommentiert. """
                 #child.seen = True
                 self.recursiv(child)
                 self.deb(child.getLids(), "%-10s E %-10s >> %s" % \
                          ("#" * self.depth, child, self.actP), 'l', 2)
-                # Wenn der circleStart am Ende des Pfades ist, dann ist der Kreis zu Ende
+                """ Wenn der circleStart am Ende des Pfades ist,
+                    dann ist der Kreis zu Ende """
                 self.actP.rmLink(links)
                 self.depth -= 1
         # Wenn die Rekursion für aktuellen Knoten endet
@@ -628,22 +654,22 @@ class checks(object):
 
     def __str__(self):
         if   self.retEC == 0:
-            retTXT = "OK"
+            ret_txt = "OK"
         elif self.retEC == 1:
-            retTXT = "WARN"
+            ret_txt = "WARN"
         elif self.retEC == 2:
-            retTXT = "CRIT"
-        retTXT += " - %s | %s" % (", ".join(self.statusList),
+            ret_txt = "CRIT"
+        ret_txt += " - %s | %s" % (", ".join(self.statusList),
                                   ", ".join(self.perfList))
 
         # perfdata
-        return retTXT
+        return ret_txt
 
-    def gui_log(self, logE):
+    def gui_log(self, log_e):
         self.log.end("create")
         self.log.finish("create")
         self.statusList.extend(self.log.get_statusList())
-        logE.set_status(", ".join(self.statusList))
+        log_e.set_status(", ".join(self.statusList))
         self.qnib.refresh_log()
 
     def addPerf(self, key, val):
@@ -656,7 +682,7 @@ class checks(object):
 
     def deb(self, lids, msg, typ, deb):
         if self.opt.lids:
-            if hasItems(lids, self.opt.lids):
+            if has_items(lids, self.opt.lids):
                 print msg
         elif typ == 'p' and self.opt.parse and self.opt.debug >= deb:
             print msg
@@ -683,17 +709,17 @@ class checks(object):
 
 
 def gui(qnib, opt):
-    from qnib_control import logC, log_entry
+    from qnib_control import log_c, log_entry
 
-    logE = log_entry("Exec parse_ibnetdiscover")
-    qnib.addLog(logE)
+    log_e = log_entry("Exec parse_ibnetdiscover")
+    qnib.addLog(log_e)
 
     cfg = libTopology.config([opt.cfgfile, ], opt)
     cfg.eval()
 
     db = dbCon.dbCon(opt)
 
-    log = logC(opt, qnib)
+    log = log_c(opt, qnib)
 
     (trap_dict, trap_list) = db.getTraps()
     chk = checks(db, opt, cfg, log)
@@ -706,7 +732,7 @@ def gui(qnib, opt):
         chk.evalMatches()
     else:
         log.debug("No traps detected...", 1)
-    chk.gui_log(logE)
+    chk.gui_log(log_e)
 
 
 def main():
@@ -717,7 +743,7 @@ def main():
         options.check()
         cfg = libTopology.config([options.cfgfile, ], options)
         cfg.eval()
-        log = libTopology.logC(options, "/var/log/parse_ibnetdiscover.log")
+        log = libTopology.log_c(options, options.logfile)
 
         db = dbCon.dbCon(options)
 

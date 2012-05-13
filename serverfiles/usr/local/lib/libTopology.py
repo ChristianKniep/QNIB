@@ -41,7 +41,7 @@ def any(iterable):
     return False
 
 
-class logC(object):
+class log_c(object):
     def __init__(self, opt, log_file=None):
         self.opt = opt
         self.log_file = log_file
