@@ -42,6 +42,8 @@ class Parameter(object):
         self.extra()
         self.debug = 0
         self.logfile = ""
+        self.pickle = False
+        self.picklefile = ""
         (self.options, args) = self.parser.parse_args()
 
         # copy over all class.attributes
@@ -91,10 +93,12 @@ class NXnode(NXobj):
 
 class NXedge(object):
     """ edge element """
-    def __init__(self, src, dst):
+    def __init__(self, s_lid, s_pint, d_lid, d_pint):
         """ Initialize with NXnode objects """
-        self.src = src
-        self.dst = dst
+        self.s_lid = s_lid
+        self.s_pint = s_pint
+        self.d_lid = d_lid
+        self.d_pint = d_pint
 
 
 class NXport(object):
@@ -107,23 +111,29 @@ class QnibNetworkx(object):
     """ object to create and alter graph """
     def __init__(self):
         """ initialise object with clean graph """
-        self.graph = nx.MultiGraph()
+        self.mgraph = nx.MultiGraph()
 
     def add_node(self, node):
         """ Add node with sys and node guid """
-        self.graph.add_node(node.guid)
+        self.mgraph.add_node(node.guid)
 
     def is_in(self, node):
         """ check whether the given node is in the graph or not"""
-        return node.guid in self.graph
+        return node.guid in self.mgraph
 
     def add_edge(self, src, edge, dst):
         """ connects src, dst with attributes """
-        self.graph.add_edge(src.guid, dst.guid,
+        self.mgraph.add_edge(src.guid, dst.guid,
                             s_lid=edge.s_lid,
                             d_lid=edge.d_lid,
-                            s_p_int=edge.s_p_int,
-                            d_p_int=edge.d_p_int)
+                            s_p_int=edge.s_pint,
+                            d_p_int=edge.d_pint)
+
+    def dump_pickle(self, pfile):
+        """ Dump graph with pickle """
+        filed = open(pfile, "wb")
+        pickle.dump(self.mgraph, filed)
+        filed.close()
 
 
 def split_link(acc):
@@ -143,32 +153,11 @@ def split_link(acc):
         guid = acc['d_n_guid']
     dst = NXnode(name, guid)
 
-    edge = {}
-    dst = {}
-    src['n_id'] = acc['s_n_id']
-    src['n_name'] = acc['s_n_name']
-    src['n_state_id'] = acc['s_n_state_id']
-    src['nt_name'] = acc['s_nt_name']
-    src['s_name'] = acc['s_s_name'] 
-    src['c_name'] = acc['s_c_name']
-    src['s_id'] = acc['s_s_id']
-    src['c_id'] = acc['s_c_id']
-    src['guid'] = acc['s_s_guid']
-    edge['s_lid'] = acc['s_p_lid']
-    edge['s_p_id'] = acc['s_p_id']
-    edge['s_p_int'] = acc['s_p_int']
-    edge['d_p_lid'] = acc['d_p_lid']
-    edge['d_p_id'] = acc['d_p_id']
-    edge['d_p_int'] = acc['d_p_int']
-    dst['n_id'] = acc['s_n_id']
-    dst['n_name'] = acc['s_n_name']
-    dst['n_state_id'] = acc['d_n_state_id']
-    dst['nt_name'] = acc['d_nt_name']
-    dst['s_name'] = acc['d_s_name']
-    dst['c_name'] = acc['d_c_name']
-    dst['s_id'] = acc['d_s_id']
-    dst['c_id'] = acc['d_c_id']
-    dst['guid'] = acc['d_s_guid']
+    s_lid = acc['s_p_lid']
+    s_pint = acc['s_p_int']
+    d_lid = acc['d_p_lid']
+    d_pint = acc['d_p_int']
+    edge = NXedge(s_lid, s_pint, d_lid, d_pint)
     return (src, edge, dst)
 
 
@@ -184,15 +173,14 @@ def main():
             break
         link = links.pop()
         (src, edge, dst) = split_link(link)
-        
+
         if not q_net.is_in(src):
             q_net.add_node(src)
         if not q_net.is_in(dst):
             q_net.add_node(dst)
         q_net.add_edge(src, edge, dst)
-        print edge
-
-        continue
+    if opt.pickle:
+        q_net.dump_pickle(opt.picklefile)
 
 if __name__ == '__main__':
     main()
