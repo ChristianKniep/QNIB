@@ -23,14 +23,17 @@ the networkx-graph will be the focus.
 """
 
 import sys
+import pickle
 from optparse import OptionParser
 sys.path.append("~/Documents/QNIB/serverfiles/usr/local/lib/PyGreSQL")
 sys.path.append('/Users/kniepbert/QNIB/serverfiles/usr/local/lib/')
 sys.path.append('/Users/kniepbert/Documents/QNIB/serverfiles/usr/local/lib/')
 import dbCon
+import networkx as nx
 
 
 class Parameter(object):
+    """ parameter object to control script """
     def __init__(self):
         # Parameterhandling
         usage_str = "qnib2networkx [options]"
@@ -52,6 +55,12 @@ class Parameter(object):
         self.parser.add_option("--logfile", dest="logfile",
             default="/tmp/qnib2networkx.log", action="store",
             help="qnib2networkx logfile (default: %default)")
+        self.parser.add_option("-p", dest="pickle",
+            default=False, action="store_true",
+            help="if set the MultiGraph will be pickled")
+        self.parser.add_option("--pfile", dest="picklefile",
+            default="/tmp/qnib2networkx.p", action="store",
+            help="file to pickle (default: %default)")
 
     def extra(self):
         """ optional options """
@@ -61,54 +70,129 @@ class Parameter(object):
         """ checking plausiblity """
         pass
 
-class qnibNetworkx(object):
-    def __init__(self):
+
+class NXobj(object):
+    """ parent of all nx_elements """
+    def __init__(self, name, guid):
+        self.guid = guid
+        self.name = name
+
+    def __eq__(self, other):
+        """ if the guids match they eq """
+        return self.guid == other.guid
+
+
+class NXnode(NXobj):
+    """ node object to handle graph element """
+    def func(self):
+        """ we'll see """
         pass
 
 
+class NXedge(object):
+    """ edge element """
+    def __init__(self, src, dst):
+        """ Initialize with NXnode objects """
+        self.src = src
+        self.dst = dst
+
+
+class NXport(object):
+    """ port element """
+    def __init__(self, lid, p_int):
+        pass
+
+
+class QnibNetworkx(object):
+    """ object to create and alter graph """
+    def __init__(self):
+        """ initialise object with clean graph """
+        self.graph = nx.MultiGraph()
+
+    def add_node(self, node):
+        """ Add node with sys and node guid """
+        self.graph.add_node(node.guid)
+
+    def is_in(self, node):
+        """ check whether the given node is in the graph or not"""
+        return node.guid in self.graph
+
+    def add_edge(self, src, edge, dst):
+        """ connects src, dst with attributes """
+        self.graph.add_edge(src.guid, dst.guid,
+                            s_lid=edge.s_lid,
+                            d_lid=edge.d_lid,
+                            s_p_int=edge.s_p_int,
+                            d_p_int=edge.d_p_int)
+
+
+def split_link(acc):
+    """ Spliting link informations """
+    if acc['s_s_name']:
+        name = acc['s_s_name']
+        guid = acc['s_s_guid']
+    else:
+        name = acc['s_n_name']
+        guid = acc['s_n_guid']
+    src = NXnode(name, guid)
+    if acc['d_s_name']:
+        name = acc['d_s_name']
+        guid = acc['d_s_guid']
+    else:
+        name = acc['d_n_name']
+        guid = acc['d_n_guid']
+    dst = NXnode(name, guid)
+
+    edge = {}
+    dst = {}
+    src['n_id'] = acc['s_n_id']
+    src['n_name'] = acc['s_n_name']
+    src['n_state_id'] = acc['s_n_state_id']
+    src['nt_name'] = acc['s_nt_name']
+    src['s_name'] = acc['s_s_name'] 
+    src['c_name'] = acc['s_c_name']
+    src['s_id'] = acc['s_s_id']
+    src['c_id'] = acc['s_c_id']
+    src['guid'] = acc['s_s_guid']
+    edge['s_lid'] = acc['s_p_lid']
+    edge['s_p_id'] = acc['s_p_id']
+    edge['s_p_int'] = acc['s_p_int']
+    edge['d_p_lid'] = acc['d_p_lid']
+    edge['d_p_id'] = acc['d_p_id']
+    edge['d_p_int'] = acc['d_p_int']
+    dst['n_id'] = acc['s_n_id']
+    dst['n_name'] = acc['s_n_name']
+    dst['n_state_id'] = acc['d_n_state_id']
+    dst['nt_name'] = acc['d_nt_name']
+    dst['s_name'] = acc['d_s_name']
+    dst['c_name'] = acc['d_c_name']
+    dst['s_id'] = acc['d_s_id']
+    dst['c_id'] = acc['d_c_id']
+    dst['guid'] = acc['d_s_guid']
+    return (src, edge, dst)
+
+
 def main():
+    """ get all links and creates graph """
     opt = Parameter()
     dbcon = dbCon.dbCon(opt)
-    q_net = qnibNetworkx()
+    q_net = QnibNetworkx()
 
-    systems = dbcon.getSystems()
-    changed_sids = []
+    links = dbcon.getLinkList()
     while True:
-        if len(systems) == 0:
+        if len(links) == 0:
             break
-        system = systems.pop()
-        print system
-        continue
-        ## Wenn der Knoten ein Chassis-Knoten ist, dann...
-        if system.isChassis():
-            # gehen erstmal alle Lampen an, stimmt das ueberhaupt noch?
-            raise IOError("sure thats working?")
-            # Infos setzen, falls noch nicht getan
-            back = self.cDB.getSystem(system.s_id)
-            # Erstellen wir Stelv-Knoten
-            chassis_sys = self.cDB.addChassis(system)
-            # Loesche alle Knoten aus meiner Systems-Liste,
-            # die dem Chassis angehoeren
-            delSys = [x for x in systems]
-            # Da system schon aus systems raus ist, behandeln wir
-            # ihn separat... irgendwie schon schmerzhaft
-            changedSids.extend(chassis_sys.drainSys(system))
-            for delCandidate in delSys:
-                if delCandidate.c_id==chassis_sys.c_id:
-                    systems.remove(delCandidate)
-                    changedSids.extend(chassis_sys.drainSys(delCandidate))
+        link = links.pop()
+        (src, edge, dst) = split_link(link)
+        
+        if not q_net.is_in(src):
+            q_net.add_node(src)
+        if not q_net.is_in(dst):
+            q_net.add_node(dst)
+        q_net.add_edge(src, edge, dst)
+        print edge
 
-                else:
-                    pass
-            switches.append(chassis_sys)
-        elif system.nt_name in ("root"):
-            roots.append(system)
-            self.deb("Appende Root: %s" % system,1)
-        elif system.nt_name in ("switch"):
-            switches.append(system)
-            self.deb("Appende Switch: %s" % system,1)
-        else:
-            systemsNext.append(system)
+        continue
 
 if __name__ == '__main__':
     main()
