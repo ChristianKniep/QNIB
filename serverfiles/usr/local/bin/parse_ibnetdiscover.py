@@ -122,18 +122,25 @@ class SWport(object):
         self.opt = opt
         self.switch = switch
         self.match = match
-        self.dportguid = ''
+        self.dportguid = 'new'
         self.ext_port = False
         self.dext_port = False
         self.port = None
         self.type = None
         self.dguid = None
         self.dport = None
-        self.dportguid = None
         self.dname = None
         self.dlid = None
         self.width = None
         self.speed = None
+
+    def __str__(self):
+        """ print object informations """
+        res = ""
+        res += self.line
+        res += "match.groups():[%s]" % ", ".join(self.match.groups())
+        res += "dportguid:%(dportguid)s" % self.__dict__
+        return res
 
     def deb(self, lids, msg, deb=0):
         """ prints debug message """
@@ -146,6 +153,7 @@ class SWport(object):
         """ extract matching groups """
         (self.port, self.type, self.dguid, self.dport, self.dportguid,
          self.dname, self.dlid, self.width, self.speed) = self.match.groups()
+        print self.dportguid
 
     def eval(self, db, cfg):
         """ evaluates input """
@@ -154,7 +162,11 @@ class SWport(object):
         switch = self.switch
         src = switch.createPort(self.port, '', switch.lid)
 
-        mat = re.search("([a-z0-9]+)", self.dportguid, re.I)
+        try:
+            mat = re.search("([a-z0-9]+)", self.dportguid, re.I)
+        except TypeError, err:
+            print self
+            raise TypeError(err)
         # TODO: Muss ich hier unterscheiden? Hoffe nicht.... :)
         if mat:
             self.dportguid = mat.group(1)
@@ -253,7 +265,6 @@ class checks(object):
         c_id = None
         # Wir muessen erstmal alle Systems und Nodes sichten, bevor wir uns an die Links machen
         for line in lines:
-            print line
             if self.matchContinue(line):
                 continue
 
