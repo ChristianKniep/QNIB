@@ -21,7 +21,6 @@ import os
 import sys
 import commands
 from optparse import OptionParser
-import pgdb
 import datetime
 import time
 
@@ -33,12 +32,14 @@ import qnib2networkx
 
 
 class Parameter(object):
+    """ Object to hold and eval arguments """
     def __init__(self):
         # Parameterhandling
         usage_str = "parse_ibnetdiscover [options]"
         self.parser = OptionParser(usage=usage_str)
         self.default()
         self.extra()
+        self.loop = ""
         self.debug = 0
         self.lids = ""
         self.file = ""
@@ -108,15 +109,16 @@ class Parameter(object):
 
 
 def has_items(l_1, l_2):
-    #print l_1,l_2
-    for l in l_1:
-        check = l in l_2
+    """ checks whether l_1 has at least one item in l_2 """
+    for item in l_1:
+        check = item in l_2
         if check:
             return True
     return False
 
 
 class SWport(object):
+    """ Parent object of switchport handling..."""
     def __init__(self, opt, switch, line, match):
         self.line = line
         self.opt = opt
@@ -215,8 +217,10 @@ class SwPortExtExt(SWport):
          self.speed) = self.match.groups()
 
 
-class checks(object):
+class parsing(object):
+    """ parsing object which holds the functionality """
     def __init__(self, db, options, cfg, log):
+        self.q_net = qnib2networkx.QnibNetworkx()
         self.db = db
         self.cfg = cfg
         self.opt = options
@@ -733,7 +737,7 @@ def gui(qnib, opt):
     log = log_c(opt, qnib)
 
     (trap_dict, trap_list) = db.getTraps()
-    chk = checks(db, opt, cfg, log)
+    chk = parsing(db, opt, cfg, log)
     chk.set_guiStuff(qnib)
     if len(trap_dict) > 0 or opt.force_uptopo:
         log.debug("%s Traps detected..." % len(trap_dict), 1)
@@ -758,31 +762,29 @@ def main():
 
         db = dbCon.dbCon(options)
 
-        (trap_dict, trap_list) = db.getTraps()
-        chk = checks(db, options, cfg, log)
-        log.debug("%s Traps detected..." % len(trap_dict), 2)
+        par = parsing(db, options, cfg, log)
         log.debug("ibnetdiscover", 0)
-        chk.ibnetdiscover()
+        par.ibnetdiscover()
         log.debug("evalSwPorts", 0)
-        chk.evalSwPorts(cfg)
+        par.evalSwPorts(cfg)
         log.debug("evalHistory", 0)
-        chk.evalHistory()
+        par.evalHistory()
         #log.debug("evalMatches", 0)
         #chk.evalMatches()
         #log.debug("/evalMatches", 0)
-        chk.addPerf('countInsLink', db.countInsLink)
-        if len(trap_dict) > 0 or options.force_uptopo:
+        par.addPerf('countInsLink', db.countInsLink)
+        #if len(trap_dict) > 0 or options.force_uptopo:
             # Should we update the topology?
             # -> A new node appears
             # -> User removed a node for good
-            #chk.update_topo()
-            #chk.create_graphs()
-            pass
-        else:
-            log.debug("%s Traps detected..." % len(trap_dict), 1)
+            #par.update_topo()
+            #par.create_graphs()
+
+        #else:
+        #    log.debug("%s Traps detected..." % len(trap_dict), 1)
 
         # we sure should redraw the graph to visualize the traffic
-        chk.dump_log()
+        par.dump_log()
         os.remove('/tmp/parse_ibnetdiscover.lock')
         # If we are not suppose to loop the script, we break
         if not options.loop:

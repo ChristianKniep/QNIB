@@ -94,6 +94,7 @@ class NXobj(object):
         """ Default the object ain't a switch """
         return False
 
+
 class NXhost(NXobj):
     """ object to handle ib-hosts within the graph"""
     def func(self):
@@ -112,6 +113,17 @@ class NXswitch(NXobj):
         return True
 
 
+class NXchassis(NXobj):
+    """ object to handle ib-switches within the graph"""
+    def func(self):
+        """ wait for functionality """
+        pass
+
+    def is_switch(self):
+        """ A chassis is also a switch """
+        return True
+
+
 class NXedge(object):
     """ edge element """
     def __init__(self, s_lid, s_pint, d_lid, d_pint):
@@ -121,10 +133,8 @@ class NXedge(object):
         self.d_lid = d_lid
         self.d_pint = d_pint
 
-
-class NXport(object):
-    """ port element """
-    def __init__(self, lid, p_int):
+    def func(self):
+        """ wait for functionality """
         pass
 
 
