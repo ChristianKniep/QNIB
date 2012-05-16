@@ -61,7 +61,7 @@ class Parameter(object):
             default=False, action="store_true",
             help="if set the MultiGraph will be pickled")
         self.parser.add_option("--pfile", dest="picklefile",
-            default="/tmp/qnib2networkx.p", action="store",
+            default="/tmp/qnib2networkx", action="store",
             help="file to pickle (default: %default)")
 
     def extra(self):
@@ -83,12 +83,33 @@ class NXobj(object):
         """ if the guids match they eq """
         return self.guid == other.guid
 
+    def get_type(self):
+        """ returns type of obj """
+        if type(self) == type(NXhost("", "")):
+            return "node"
+        elif type(self) == type(NXswitch("", "")):
+            return "switch"
 
-class NXnode(NXobj):
-    """ node object to handle graph element """
+    def is_switch(self):
+        """ Default the object ain't a switch """
+        return False
+
+class NXhost(NXobj):
+    """ object to handle ib-hosts within the graph"""
     def func(self):
-        """ we'll see """
+        """ wait for functionality """
         pass
+
+
+class NXswitch(NXobj):
+    """ object to handle ib-switches within the graph"""
+    def func(self):
+        """ wait for functionality """
+        pass
+
+    def is_switch(self):
+        """ A switch is a switch """
+        return True
 
 
 class NXedge(object):
@@ -111,47 +132,91 @@ class QnibNetworkx(object):
     """ object to create and alter graph """
     def __init__(self):
         """ initialise object with clean graph """
-        self.mgraph = nx.MultiGraph()
+        self.m_graph = nx.MultiGraph()
+        self.sw_graph = nx.MultiGraph()
+
+    def edges(self):
+        """ returns all edges """
+        return self.m_graph.edges()
 
     def add_node(self, node):
         """ Add node with sys and node guid """
-        self.mgraph.add_node(node.guid)
+        if node.get_type() == "switch":
+            self.sw_graph.add_node(node.name)
+            self.sw_graph.node[node.name]['guid'] = node.guid
+        self.m_graph.add_node(node.name)
+        self.m_graph.node[node.name]['guid'] = node.guid
 
     def is_in(self, node):
         """ check whether the given node is in the graph or not"""
-        return node.guid in self.mgraph
+        return node.guid in self.m_graph
 
     def add_edge(self, src, edge, dst):
         """ connects src, dst with attributes """
-        self.mgraph.add_edge(src.guid, dst.guid,
+        self.m_graph.add_edge(src.name, dst.name,
+                            s_lid=edge.s_lid,
+                            d_lid=edge.d_lid,
+                            s_p_int=edge.s_pint,
+                            d_p_int=edge.d_pint)
+        if src.is_switch() and dst.is_switch():
+            self.sw_graph.add_edge(src.name, dst.name,
                             s_lid=edge.s_lid,
                             d_lid=edge.d_lid,
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)
 
-    def dump_pickle(self, pfile):
-        """ Dump graph with pickle """
-        filed = open(pfile, "wb")
-        pickle.dump(self.mgraph, filed)
+    def pickle_mgraph(self, pfile):
+        """ Dump multigraph with pickle """
+        filed = open(pfile + ".mg", "wb")
+        pickle.dump(self.m_graph, filed)
         filed.close()
+
+    def pickle_swgraph(self, pfile):
+        """ Dump switch graph with pickle """
+        filed = open(pfile + ".sw", "wb")
+        pickle.dump(self.sw_graph, filed)
+        filed.close()
+
+    def __str__(self):
+        """ print formated network """
+        res = "s"
+        # ss
+        return res
 
 
 def split_link(acc):
     """ Spliting link informations """
-    if acc['s_s_name']:
+    # If its an chassis we create a chassis node
+    if acc['s_c_name'] != 'empty':
+        name = acc['s_c_name']
+        guid = acc['s_c_name']
+    elif acc['s_s_name']:
         name = acc['s_s_name']
         guid = acc['s_s_guid']
     else:
         name = acc['s_n_name']
         guid = acc['s_n_guid']
-    src = NXnode(name, guid)
-    if acc['d_s_name']:
+    if acc['s_nt_name'] == "switch":
+        src = NXswitch(name, guid)
+    elif acc['s_nt_name'] == "host":
+        src = NXhost(name, guid)
+    else:
+        raise IOError("node type !(host|switch|chassis)")
+    if acc['d_c_name'] != 'empty':
+        name = acc['d_c_name']
+        guid = acc['d_c_name']
+    elif acc['d_s_name']:
         name = acc['d_s_name']
         guid = acc['d_s_guid']
     else:
         name = acc['d_n_name']
         guid = acc['d_n_guid']
-    dst = NXnode(name, guid)
+    if acc['d_nt_name'] == "switch":
+        dst = NXswitch(name, guid)
+    elif acc['d_nt_name'] == "host":
+        dst = NXhost(name, guid)
+    else:
+        raise IOError("node type !(host|switch|chassis)")
 
     s_lid = acc['s_p_lid']
     s_pint = acc['s_p_int']
@@ -180,7 +245,8 @@ def main():
             q_net.add_node(dst)
         q_net.add_edge(src, edge, dst)
     if opt.pickle:
-        q_net.dump_pickle(opt.picklefile)
+        q_net.pickle_mgraph(opt.picklefile)
+        q_net.pickle_swgraph(opt.picklefile)
 
 if __name__ == '__main__':
     main()
