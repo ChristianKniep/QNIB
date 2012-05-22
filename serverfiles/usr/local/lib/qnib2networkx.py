@@ -78,6 +78,7 @@ class NXobj(object):
     def __init__(self, name, guid):
         self.guid = guid
         self.name = name
+        self.asic_count = 0
 
     def __eq__(self, other):
         """ if the guids match they eq """
@@ -89,6 +90,8 @@ class NXobj(object):
             return "node"
         elif type(self) == type(NXswitch("", "")):
             return "switch"
+        elif type(self) == type(NXchassis("", "")):
+            return "chassis"
 
     def is_switch(self):
         """ Default the object ain't a switch """
@@ -97,10 +100,27 @@ class NXobj(object):
 
 class NXhost(NXobj):
     """ object to handle ib-hosts within the graph"""
+    def is_real(self):
+        """ a host is a real ib entity """
+        return True
+
+
+class NXsystem(NXobj):
+    """ object to handle ib-systems within the graph"""
+    def __init__(self, name, guid):
+        NXobj.__init__(self, name, guid)
+        self.switchguid = None
+
     def func(self):
         """ wait for functionality """
         pass
 
+    def __str__(self):
+        return self.guid
+
+    def update_switchguid(self, switchguid):
+        """ update the switchguid """
+        self.switchguid = switchguid
 
 class NXswitch(NXobj):
     """ object to handle ib-switches within the graph"""
@@ -110,6 +130,10 @@ class NXswitch(NXobj):
 
     def is_switch(self):
         """ A switch is a switch """
+        return True
+
+    def is_real(self):
+        """ checking if it an ASIC of a modular switch or a compact switch """
         return True
 
 
@@ -122,6 +146,10 @@ class NXchassis(NXobj):
     def is_switch(self):
         """ A chassis is also a switch """
         return True
+
+    def is_real(self):
+        """ A chassis is only a real ib-object if it holds one asic"""
+        return self.asic_count == 1
 
 
 class NXedge(object):
@@ -142,28 +170,48 @@ class QnibNetworkx(object):
     """ object to create and alter graph """
     def __init__(self):
         """ initialise object with clean graph """
-        self.m_graph = nx.MultiGraph()
+        # ib-graph with all real objects
+        self.ib_graph = nx.MultiGraph()
+        # logical view with human readable switches
         self.sw_graph = nx.MultiGraph()
+        # list of systems
+        self.systems = []
 
     def edges(self):
         """ returns all edges """
-        return self.m_graph.edges()
+        return self.ib_graph.edges()
 
     def add_node(self, node):
         """ Add node with sys and node guid """
-        if node.get_type() == "switch":
+        if node.get_type() == "chassis" or \
+            (node.get_type() == "switch" and not node.part_of("chassis")):
+            # If we are a chassis or an independent switch,
+            # we are added to the switch graph
+            #print "is switch"
             self.sw_graph.add_node(node.name)
             self.sw_graph.node[node.name]['guid'] = node.guid
-        self.m_graph.add_node(node.name)
-        self.m_graph.node[node.name]['guid'] = node.guid
+        if node.is_real():
+            # if the node is a real IB-entity, we are added to the ib-graph
+            #print "is real"
+            self.ib_graph.add_node(node.name)
+            self.ib_graph.node[node.name]['guid'] = node.guid
+
+    def add_sys(self, system):
+        """ add a system to the list """
+        if system not in self.systems:
+            self.systems.append(system)
+
+    def update_sys_switchguid(self, sysimgguid, switchguid):
+        """ update the switchguid of system identified with systemguid """
+        self.systems[sysimgguid].update_switchguid(switchguid)
 
     def is_in(self, node):
         """ check whether the given node is in the graph or not"""
-        return node.guid in self.m_graph
+        return node.guid in self.ib_graph
 
     def add_edge(self, src, edge, dst):
         """ connects src, dst with attributes """
-        self.m_graph.add_edge(src.name, dst.name,
+        self.ib_graph.add_edge(src.name, dst.name,
                             s_lid=edge.s_lid,
                             d_lid=edge.d_lid,
                             s_p_int=edge.s_pint,
@@ -175,10 +223,10 @@ class QnibNetworkx(object):
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)
 
-    def pickle_mgraph(self, pfile):
-        """ Dump multigraph with pickle """
-        filed = open(pfile + ".mg", "wb")
-        pickle.dump(self.m_graph, filed)
+    def pickle_ibgraph(self, pfile):
+        """ Dump IB-multigraph with pickle """
+        filed = open(pfile + ".ibg", "wb")
+        pickle.dump(self.ib_graph, filed)
         filed.close()
 
     def pickle_swgraph(self, pfile):
@@ -192,6 +240,7 @@ class QnibNetworkx(object):
         res = "s"
         # ss
         return res
+
 
 
 def split_link(acc):
@@ -255,7 +304,7 @@ def main():
             q_net.add_node(dst)
         q_net.add_edge(src, edge, dst)
     if opt.pickle:
-        q_net.pickle_mgraph(opt.picklefile)
+        q_net.pickle_ibgraph(opt.picklefile)
         q_net.pickle_swgraph(opt.picklefile)
 
 if __name__ == '__main__':
