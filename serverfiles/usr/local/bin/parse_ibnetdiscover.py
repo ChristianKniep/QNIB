@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
+"""
 # This file is part of QNIB.  QNIB is free software: you can
 # redistribute it and/or modify it under the terms of the GNU General Public
 # License as published by the Free Software Foundation, version 2.
@@ -15,6 +15,7 @@
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 # Copyright Christian Kniep, 2012
+"""
 
 import re
 import os
@@ -22,7 +23,7 @@ import sys
 import commands
 from optparse import OptionParser
 import datetime
-import time
+
 
 sys.path.append('/Users/kniepbert/QNIB/serverfiles/usr/local/lib/')
 sys.path.append('/Users/kniepbert/Documents/QNIB/serverfiles/usr/local/lib/')
@@ -223,6 +224,12 @@ class Parsing(object):
         self.sw_ports = []
         self.sysimgguid = None
         self.c_nr = None
+        self.wall = 0
+        self.chip = None
+        self.nodeguid = None
+        self.l_board = None
+        self.f_board = None
+        self.chassis_nr = None
 
     def dump_graphs(self):
         """ pickle the graphs """
@@ -282,20 +289,14 @@ class Parsing(object):
             if self.match_system(line):
                 continue
             # Modulare Switches
-            #if self.match_switch(line):
-            #    continue
+            if self.match_switch(line):
+                continue
             # CA
-            #if self.match_ca(line):
-            #    continue
-
-            #if self.match_continue(line):
-            #    continue
-            ## Modulare Switches
-            #if self.match_switch(line, True):
-            #    continue
-            ## switchport
-            #if self.match_switchport_gen(line):
-            #    continue
+            if self.match_ca(line):
+                continue
+            # Edges
+            if self.match_switchport_gen(line):
+                continue
 
         end = int(datetime.datetime.now().strftime("%s"))
         self.wall = end - self.start
@@ -310,7 +311,7 @@ class Parsing(object):
             guid = mat.group(2)
             name = self.chassis_names[guid]['name']
             self.chassis[self.c_nr] = guid
-            chassis = qnx.NXchassis(name, guid)
+            chassis = qnx.NXchassis(guid, name)
             self.q_net.add_node(chassis)
         return mat
 
@@ -335,50 +336,73 @@ class Parsing(object):
             return True
         return False
 
-    def match_switchport_gen(self, line, guid=False):
+    def match_switchport_gen(self, line):
         """ generic switchportmatching """
-        if guid and re.search(guid, line):
-            print line
-        acc = self.match_switchport_extext(line, guid)
-        if acc:
+        # while riding the train it seems clever to skip links where
+        # the destination is not in the graph yet
+        # if not in, it will be matched when it is time
+        # to be specific: when the destination is the source
+        if self.match_switchport_extext(line):
             return True
-        acc = self.match_switchport_dext(line, guid)
-        if acc:
+        if self.match_switchport_ext(line):
             return True
-        acc = self.match_switchport_ext(line, guid)
-        if acc:
+        """
+        if self.match_switchport_dext(line, guid):
             return True
         acc = self.match_switchport(line, guid)
         if acc:
             return True
+        """
         return False
 
-    def match_switchport(self, line, guid):
-        """ Matching simplest switchport (no external ports) """
-        reg = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\""
-        reg += "\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+    def match_switchport_extext(self, line):
+        """ Matching two external switchports """
+        #[14][ext 2]	"S-0008f104003f5c40"[24][ext 15]
+        # "ISR9288/ISR9096 Voltaire sLB-24" lid 208 4xSDR
+        #[15][ext 15]    "S-0008f104003f5c43"[22][ext 19]
+        # "ISR9288/ISR9096 Voltaire sLB-24" lid 211 4xSDR
+        reg = "^\[(\d+)\]\[ext (\d+)\][ \t]+\"[SH]-[0]*([a-z0-9]+)\""
+        reg += "\[(\d+)\]\[ext (\d+)\].*#[ \t]+\".*\""
+        reg += "[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
-            if guid and re.search(guid, line):
-                print "Sw -> got it"
-            # Port gefunden
-            #(self.port,self.type,self.dguid,self.dport,self.dportguid,
-            #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            self.swPorts.append(SWport(self.opt, self.switch, line, mat))
-            return True
+            # if dst not yet in the graph, skip it
+            (s_pint, s_pext, d_nguid, d_pint, d_pext,
+             width, speed) = mat.groups()
+            if self.q_net.dst_not_in(d_nguid):
+                return True
+            else:
+                print "in"
+                # while we all meet within the graph lets insert the link
+                src = self.q_net.get_node(self.nodeguid)
+                dst = self.q_net.get_node(d_nguid)
+                edge = qnx.NXedge(src, s_pint, s_pext,
+                                  dst, d_pint, d_pext,
+                                  width, speed)
+                self.q_net.add_edge(src, edge, dst)
+                return True
         return False
 
-    def match_switchport_ext(self, line, guid):
+    def match_switchport_ext(self, line):
         """ Matching switchport with external port to normal port """
-        reg = "^\[(\d+)\]\[ext (\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\""
-        reg += "\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+        reg = "^\[(\d+)\]\[ext (\d+)\][ \t]+\"[SH]-[0]*([a-z0-9]+)\""
+        reg += "\[(\d+)\].*#[ \t]+\".*\"[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
-            if guid and re.search(guid, line):
-                print "SwExt -> got it"
-            # Port gefunden
-            self.swPorts.append(SwPortExt(self.opt, self.switch, line, mat))
-            return True
+            (s_pint, s_pext, d_nguid, d_pint,
+             width, speed) = mat.groups()
+            if self.q_net.dst_not_in(d_nguid):
+                return True
+            else:
+                print "in"
+                # while we all meet within the graph lets insert the link
+                src = self.q_net.get_node(self.nodeguid)
+                dst = self.q_net.get_node(d_nguid)
+                edge = qnx.NXedge(src, s_pint, s_pext,
+                                  dst, d_pint, None,
+                                  width, speed)
+                self.q_net.add_edge(src, edge, dst)
+                return True
         return False
 
     def match_switchport_dext(self, line, guid):
@@ -397,21 +421,18 @@ class Parsing(object):
             return True
         return False
 
-    def match_switchport_extext(self, line, guid):
-        """ Matching two external switchports """
-        #[14][ext 2]	"S-0008f104003f5c40"[24][ext 15]
-        # "ISR9288/ISR9096 Voltaire sLB-24" lid 208 4xSDR
-        #[15][ext 15]    "S-0008f104003f5c43"[22][ext 19]
-        # "ISR9288/ISR9096 Voltaire sLB-24" lid 211 4xSDR
-        reg = "^\[(\d+)\]\[ext (\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\""
-        reg += "\[(\d+)\]\[ext (\d+)\].*#[ \t]+\"(.*)\""
-        reg += "[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+    def match_switchport(self, line, guid):
+        """ Matching simplest switchport (no external ports) """
+        reg = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\""
+        reg += "\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
             if guid and re.search(guid, line):
-                print 'SwExtExt -> got it'
+                print "Sw -> got it"
             # Port gefunden
-            self.swPorts.append(SwPortExtExt(self.opt, self.switch, line, mat))
+            #(self.port,self.type,self.dguid,self.dport,self.dportguid,
+            #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
+            #self.swPorts.append(SWport(self.opt, self.switch, line, mat))
             return True
         return False
 
@@ -421,17 +442,9 @@ class Parsing(object):
         mat = re.match(reg, line)
         if mat:
             (guid, name) = mat.groups()
-            if guid in self.opt.node_guids.keys():
-                node = self.opt.node_guids[guid]
-            else:
-                node = lib_topology.parseNode(self.opt, self.cfg,
-                                             self.opt.node_guids)
-            node.setHost()
-            node.setSys(self.sys)
-            node.setName(name)
-            node.setGuid(guid)
-            node.updateDB()
-            self.node = node
+            self.nodeguid = guid
+            host = qnx.NXhost(guid, name)
+            self.q_net.add_node(host)
             return True
         return False
 
@@ -460,38 +473,46 @@ class Parsing(object):
         """ extract the switchguid out of ibnetdiscover """
         ## in newer switches the systemguid==switchguid
         # switchguid=0x8f105002011c8(8f105002011c8)	#
-        reg = "switchguid=0x([0-9a-f]+).*"
-        mat = re.match(reg, line)
-        if  mat:
-            switchguid = mat.groups(1)
-            self.q_net.update_sys_switchguid(self.sysimgguid, switchguid)
-            return True
+        reg_wo_name = "switchguid=0x([0-9a-f]+).*"
+        mat_wo_name = re.match(reg_wo_name, line)
+        if  mat_wo_name:
+            guid = mat_wo_name.groups(1)
+            name = None
         ## but older switches refer to there switchguid(!=systemguid) when
         ## addressing the switchports, so we better be
         ## sure to have the big picture
         # switchguid=0x8f104004050c7(8f104004050c7)	# ISR2004 Spine 1 Chip 1
-
-    def match_switch(self, line, light=False):
-        reg = '.*S-[0]*([a-z0-9]+).*# "(.*)".*lid (\d+) lmc'
+        reg = "switchguid=0x([0-9a-f]+)\((?:[0-9a-f]+)\) # (.*)"
         mat = re.match(reg, line)
         if  mat:
-            (guid, name, lid) = mat.groups()
-            if guid in self.opt.node_guids.keys():
-                self.deb(set([lid, ]),
-                    "Switch '%s (guid:%s / lid:%s)' schon drin?" % \
-                    (name, guid, lid), 'p', 0)
-                switch = self.opt.node_guids[guid]
-            else:
-                switch = lib_topology.parseNode(self.opt, self.cfg,
-                                               self.opt.node_guids)
-                switch.setSys(self.sys)
-                switch.setSwitch()
-                switch.setLid(lid)
-                switch.setGuid(guid)
-                switch.setName(name)
-                self.deb(switch.getLids(), "## Switch: %s" % switch, "p", 1)
-                switch.updateDB()
-            self.switch = switch
+            (guid, name) = mat.groups()
+        if mat or mat_wo_name:
+            self.q_net.update_sys_switch(self.sysimgguid, guid, name)
+            return True
+        else:
+            return False
+
+    def match_switch(self, line):
+        """ switches are matched here """
+        # if a chassis is given it will be handeled
+        #Switch	24 "S-0008f104003f58ef"	# "name" base port 0 lid 203 lmc 0
+        reg = 'Switch ([0-9]+) "S-[0]*([a-z0-9]+).*# "(.*)".*lid (\d+) lmc'
+        mat = re.match(reg, line)
+        if  mat:
+            # the evaluated name will be the nodename
+            # -> seems to describe the moduletype in older modulare switches
+            # -> modern mod. switches describes the hostname (so human readable)
+            # previously we extracted
+            #  * chassisname (given chassisid should be maped within the cfg)
+            #   -> the for sure human readable one [sig!]
+            #  * switchname  (appended to the switchguid like Lineboard9 Chip1)
+            #   -> importent to know which module of the switch is handled
+            (swports, nguid, nname, lid) = mat.groups()
+            # if we match here, switch-/sysimgguid _has_ to be given
+            # therefore we can adress the system
+            system = self.q_net.get_sys(self.sysimgguid)
+            system.update_switch(swports, nguid, nname, lid)
+            self.nodeguid = nguid
         return mat
 
     def __str__(self):

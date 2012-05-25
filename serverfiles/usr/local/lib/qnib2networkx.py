@@ -75,7 +75,7 @@ class Parameter(object):
 
 class NXobj(object):
     """ parent of all nx_elements """
-    def __init__(self, name, guid):
+    def __init__(self, guid, name):
         self.guid = guid
         self.name = name
         self.asic_count = 0
@@ -97,9 +97,16 @@ class NXobj(object):
         """ Default the object ain't a switch """
         return False
 
+    def __str__(self):
+        res = "%s, %s" % (self.guid, self.name)
+        return res
+
 
 class NXhost(NXobj):
     """ object to handle ib-hosts within the graph"""
+    def __init__(self, guid, name):
+        NXobj.__init__(self, guid, name)
+
     def is_real(self):
         """ a host is a real ib entity """
         return True
@@ -110,6 +117,7 @@ class NXsystem(NXobj):
     def __init__(self, name, guid):
         NXobj.__init__(self, name, guid)
         self.switchguid = None
+        self.switchname = None
 
     def func(self):
         """ wait for functionality """
@@ -118,9 +126,14 @@ class NXsystem(NXobj):
     def __str__(self):
         return self.guid
 
-    def update_switchguid(self, switchguid):
+    def update_switchguid(self, guid):
         """ update the switchguid """
-        self.switchguid = switchguid
+        self.switchguid = guid
+
+    def update_switchname(self, name):
+        """ update the switchguid """
+        self.switchname = name
+
 
 class NXswitch(NXobj):
     """ object to handle ib-switches within the graph"""
@@ -154,9 +167,12 @@ class NXchassis(NXobj):
 
 class NXedge(object):
     """ edge element """
-    def __init__(self, s_lid, s_pint, d_lid, d_pint):
+    def __init__(self, src, s_pint, s_pext,
+                 d_nguid, dst, d_pext, width, speed):
         """ Initialize with NXnode objects """
-        self.s_lid = s_lid
+        self.src = src
+        self.dst = dst
+        
         self.s_pint = s_pint
         self.d_lid = d_lid
         self.d_pint = d_pint
@@ -175,7 +191,7 @@ class QnibNetworkx(object):
         # logical view with human readable switches
         self.sw_graph = nx.MultiGraph()
         # list of systems
-        self.systems = []
+        self.systems = {}
 
     def edges(self):
         """ returns all edges """
@@ -189,21 +205,33 @@ class QnibNetworkx(object):
             # we are added to the switch graph
             #print "is switch"
             self.sw_graph.add_node(node.name)
-            self.sw_graph.node[node.name]['guid'] = node.guid
+            self.sw_graph.node[node.name]['node'] = node
         if node.is_real():
             # if the node is a real IB-entity, we are added to the ib-graph
-            #print "is real"
-            self.ib_graph.add_node(node.name)
-            self.ib_graph.node[node.name]['guid'] = node.guid
+            self.ib_graph.add_node(node.guid)
+            self.ib_graph.node[node.guid]['node'] = node
+
+    def get_node(self, nguid):
+        """ returns the NXnode object with given nguid"""
+        return self.ib_graph.node[nguid]
 
     def add_sys(self, system):
         """ add a system to the list """
-        if system not in self.systems:
-            self.systems.append(system)
+        if system.guid not in self.systems.keys():
+            self.systems[system.guid] = system
 
-    def update_sys_switchguid(self, sysimgguid, switchguid):
-        """ update the switchguid of system identified with systemguid """
+    def get_sys(self, sysimgguid):
+        """ get a system out of the system-dict (should be a graph?)"""
+        return self.systems[sysimgguid]
+
+    def update_sys_switch(self, sysimgguid, switchguid, switchname):
+        """ update the switchguid/-name of system identified with systemguid """
         self.systems[sysimgguid].update_switchguid(switchguid)
+        self.systems[sysimgguid].update_switchname(switchname)
+
+    def dst_not_in(self, nguid):
+        """ determin whether a nodeguid of a switchport destination is in """
+        return not nguid in self.ib_graph
 
     def is_in(self, node):
         """ check whether the given node is in the graph or not"""
@@ -242,7 +270,6 @@ class QnibNetworkx(object):
         return res
 
 
-
 def split_link(acc):
     """ Spliting link informations """
     # If its an chassis we create a chassis node
@@ -256,9 +283,9 @@ def split_link(acc):
         name = acc['s_n_name']
         guid = acc['s_n_guid']
     if acc['s_nt_name'] == "switch":
-        src = NXswitch(name, guid)
+        src = NXswitch(guid, name)
     elif acc['s_nt_name'] == "host":
-        src = NXhost(name, guid)
+        src = NXhost(guid, name)
     else:
         raise IOError("node type !(host|switch|chassis)")
     if acc['d_c_name'] != 'empty':
@@ -271,9 +298,9 @@ def split_link(acc):
         name = acc['d_n_name']
         guid = acc['d_n_guid']
     if acc['d_nt_name'] == "switch":
-        dst = NXswitch(name, guid)
+        dst = NXswitch(guid, name)
     elif acc['d_nt_name'] == "host":
-        dst = NXhost(name, guid)
+        dst = NXhost(guid, name)
     else:
         raise IOError("node type !(host|switch|chassis)")
 
