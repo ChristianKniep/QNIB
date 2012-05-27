@@ -223,13 +223,13 @@ class Parsing(object):
         self.sys_guids = {}
         self.sw_ports = []
         self.sysimgguid = None
-        self.c_nr = None
         self.wall = 0
         self.chip = None
         self.nodeguid = None
         self.l_board = None
         self.f_board = None
-        self.chassis_nr = None
+        self.chassis_guid = None
+        self.chassis_name = None
 
     def dump_graphs(self):
         """ pickle the graphs """
@@ -262,10 +262,30 @@ class Parsing(object):
 
     def reset_board(self):
         """ FWIW initialize all board stuff """
-        self.chip = None
-        self.l_board = None
-        self.f_board = None
-        self.chassis_nr = None
+        self.print_board()
+        self.chassis_guid = None
+        self.chassis_name = None
+        return all(map(lambda x: x == None, \
+                (self.chassis_guid, self.chassis_name)))
+
+    def set_chassis(self, chassis_guid, chassis_name):
+        """ set chassisvars to use them in systems/nodes to come """
+        self.chassis_guid = chassis_guid
+        self.chassis_name = chassis_name
+
+    def get_chassis(self):
+        """ get stored chassis information """
+        return (self.chassis_guid, self.chassis_name)
+
+    def print_board(self):
+        """ print chassis informations """
+        if not all(map(lambda x: x == None, \
+                (self.chassis_guid, self.chassis_name))):
+            print "chassisGuid:%s chassisName:%s" % \
+                (self.chassis_guid, self.chassis_name)
+        #else:
+        if False:
+            print "nothing to reset"
 
     def ibnetdiscover(self):
         """ eval ibnetdiscover and creates networkx.MultiGraph """
@@ -282,7 +302,7 @@ class Parsing(object):
             reg = "^vendid.*"
             mat = re.match(reg, line)
             if mat:
-                self.reset_board()
+                continue
 
             if self.match_chassis(line):
                 continue
@@ -307,11 +327,11 @@ class Parsing(object):
         reg = "Chassis (\d+) \(guid 0x([0-9a-f]+)\)"
         mat = re.match(reg, line)
         if mat:
-            self.c_nr = mat.group(1)
-            guid = mat.group(2)
-            name = self.chassis_names[guid]['name']
-            self.chassis[self.c_nr] = guid
-            chassis = qnx.NXchassis(guid, name)
+            (c_nr, c_guid) = mat.groups()
+            name = self.chassis_names[c_guid]['name']
+            cname = self.eval_name(name)[0]
+            self.set_chassis(c_guid, cname)
+            chassis = qnx.NXchassis(c_guid, cname)
             self.q_net.add_node(chassis)
         return mat
 
@@ -346,13 +366,10 @@ class Parsing(object):
             return True
         if self.match_switchport_ext(line):
             return True
-        """
-        if self.match_switchport_dext(line, guid):
+        if self.match_switchport_dext(line):
             return True
-        acc = self.match_switchport(line, guid)
-        if acc:
+        if self.match_switchport(line):
             return True
-        """
         return False
 
     def match_switchport_extext(self, line):
@@ -372,7 +389,6 @@ class Parsing(object):
             if self.q_net.dst_not_in(d_nguid):
                 return True
             else:
-                print "in"
                 # while we all meet within the graph lets insert the link
                 src = self.q_net.get_node(self.nodeguid)
                 dst = self.q_net.get_node(d_nguid)
@@ -394,7 +410,6 @@ class Parsing(object):
             if self.q_net.dst_not_in(d_nguid):
                 return True
             else:
-                print "in"
                 # while we all meet within the graph lets insert the link
                 src = self.q_net.get_node(self.nodeguid)
                 dst = self.q_net.get_node(d_nguid)
@@ -405,35 +420,46 @@ class Parsing(object):
                 return True
         return False
 
-    def match_switchport_dext(self, line, guid):
+    def match_switchport_dext(self, line):
         """ Matching (nonexternal) switchport with external port """
         #Sw [1]  "S-0008f104003f63de"[14][ext 14]
-        reg = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\"\[(\d+)\]\[ext (\d+)\]"
-        reg += ".*#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+        reg = "^\[(\d+)\][ \t]+\"[SH]-[0]*([a-z0-9]+)\"\[(\d+)\]\[ext (\d+)\]"
+        reg += ".*#[ \t]+\".*\"[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
-            if guid and re.search(guid, line):
-                print "SwDExt -> got it"
-            # Port gefunden
-            #(self.port,self.type,self.dguid,self.dport,self.dportguid,
-            #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            self.swPorts.append(SwPortDExt(self.opt, self.switch, line, mat))
-            return True
+            (s_pint, d_nguid, d_pint, d_pext, width, speed) = mat.groups()
+            if self.q_net.dst_not_in(d_nguid):
+                return True
+            else:
+                # while we all meet within the graph lets insert the link
+                src = self.q_net.get_node(self.nodeguid)
+                dst = self.q_net.get_node(d_nguid)
+                edge = qnx.NXedge(src, s_pint, None,
+                                  dst, d_pint, d_pext,
+                                  width, speed)
+                self.q_net.add_edge(src, edge, dst)
+                return True
         return False
 
-    def match_switchport(self, line, guid):
+    def match_switchport(self, line):
         """ Matching simplest switchport (no external ports) """
-        reg = "^\[(\d+)\][ \t]+\"([SH])-[0]*([a-z0-9]+)\""
-        reg += "\[(\d+)\](.*)#[ \t]+\"(.*)\"[ \t]+lid[ \t](\d+) (\d+)x([A-Z]DR)"
+        reg = "^\[(\d+)\][ \t]+\"[SH]-[0]*([a-z0-9]+)\""
+        reg += "\[(\d+)\].*#[ \t]+\".*\"[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
-            if guid and re.search(guid, line):
-                print "Sw -> got it"
-            # Port gefunden
-            #(self.port,self.type,self.dguid,self.dport,self.dportguid,
-            #self.dname,self.dlid,self.width,self.speed) = self.match.groups()
-            #self.swPorts.append(SWport(self.opt, self.switch, line, mat))
-            return True
+            (s_pint, d_nguid, d_pint,
+             width, speed) = mat.groups()
+            if self.q_net.dst_not_in(d_nguid):
+                return True
+            else:
+                # while we all meet within the graph lets insert the link
+                src = self.q_net.get_node(self.nodeguid)
+                dst = self.q_net.get_node(d_nguid)
+                edge = qnx.NXedge(src, s_pint, None,
+                                  dst, d_pint, None,
+                                  width, speed)
+                self.q_net.add_edge(src, edge, dst)
+                return True
         return False
 
     def match_ca(self, line):
@@ -442,8 +468,9 @@ class Parsing(object):
         mat = re.match(reg, line)
         if mat:
             (guid, name) = mat.groups()
+            nname = self.eval_name(name)[0]
             self.nodeguid = guid
-            host = qnx.NXhost(guid, name)
+            host = qnx.NXhost(guid, nname)
             self.q_net.add_node(host)
             return True
         return False
@@ -454,8 +481,8 @@ class Parsing(object):
         reg = "sysimgguid=0x([0-9a-f]+)[ \t]+# Chassis (\d+)"
         mat = re.match(reg, line)
         if mat:
-            guid = mat.group(1)
-            system = qnx.NXsystem(None, guid)
+            self.sysimgguid = mat.group(1)
+            system = qnx.NXsystem(self.sysimgguid, None)
             self.q_net.add_sys(system)
             return True
         # systemguid
@@ -464,7 +491,7 @@ class Parsing(object):
         if mat:
             self.reset_board()
             self.sysimgguid = mat.group(1)
-            system = qnx.NXsystem(None, self.sysimgguid)
+            system = qnx.NXsystem(self.sysimgguid, None)
             self.q_net.add_sys(system)
             return True
         return False
@@ -496,7 +523,8 @@ class Parsing(object):
         """ switches are matched here """
         # if a chassis is given it will be handeled
         #Switch	24 "S-0008f104003f58ef"	# "name" base port 0 lid 203 lmc 0
-        reg = 'Switch ([0-9]+) "S-[0]*([a-z0-9]+).*# "(.*)".*lid (\d+) lmc'
+        reg = 'Switch[ \t]+([0-9]+)[ \t]+"S-[0]*([a-z0-9]+).*#'
+        reg += '[ \t]+"(.*)".*lid[ \t]+(\d+)[ \t]+lmc'
         mat = re.match(reg, line)
         if  mat:
             # the evaluated name will be the nodename
@@ -507,13 +535,66 @@ class Parsing(object):
             #   -> the for sure human readable one [sig!]
             #  * switchname  (appended to the switchguid like Lineboard9 Chip1)
             #   -> importent to know which module of the switch is handled
-            (swports, nguid, nname, lid) = mat.groups()
-            # if we match here, switch-/sysimgguid _has_ to be given
-            # therefore we can adress the system
-            system = self.q_net.get_sys(self.sysimgguid)
-            system.update_switch(swports, nguid, nname, lid)
-            self.nodeguid = nguid
+            (swports, nguid, name, lid) = mat.groups()
+
+            # if we are in a chassis we should have informations stored
+            (c_guid, c_name) = self.get_chassis()
+            if c_guid != None:
+                # if so, we name the node with the chassis-name
+                switch = self.q_net.get_switch(c_name)
+            else:
+                self.nodeguid = nguid
+                nname = self.eval_name(name)[0]
+                # if we match here, switch-/sysimgguid _has_ to be given
+                # therefore we can adress the system
+                system = self.q_net.get_sys(self.sysimgguid)
+                if type(system) == type(None):
+                    # We got a singular switch, so we create a chassis ans system
+                    # for the switchgraph
+                    chassis = qnx.NXchassis(nguid, nname)
+                    system = qnx.NXsystem(nguid, nname)
+                system.update_switch(swports, nguid, nname, lid)
+                switch = system.create_node()
+            self.q_net.add_node(switch)
         return mat
+
+    def eval_name(self, name):
+        """ eval the hostname to craft out human readable ones """
+        new_type = None
+        new_name = name
+        reg = "(%s)" % "|".join(self.host_pat.keys())
+        mat = re.match(reg, name, re.I)
+        if mat:
+            for reg in self.host_pat.keys():
+                mat = re.match("^%s$" % reg, name, re.I)
+                if mat:
+                    if 'regname' in self.host_pat[reg].keys():
+                        # Regname formatiert die groups des regex neu
+                        # X,Y sind platzhalter fuer die jeweiligen Matches
+                        # Bei X wird die aktuelle Gruppe eingetragen
+                        # Y wird ausgelassen,
+                        #   z.B. wenn man oder matched '(spine|line)' 
+                        regname = self.host_pat[reg]['regname']
+                        res = ""
+                        cnt = 1
+                        for letter in regname:
+                            if letter == "X":
+                                res += mat.group(cnt)
+                                cnt += 1
+                            elif letter == "Y":
+                                cnt += 1
+                            else:
+                                res += letter
+                        new_name = res
+                    if 'type' in self.host_pat[reg].keys():
+                        # hmm... what about the type
+                        new_type = self.host_pat[reg]['type']
+                    if 'name' in self.host_pat[reg].keys():
+                        new_name = self.host_pat[reg]['name']
+                    if 'short' in self.host_pat[reg].keys():
+                        new_name = "%s%s" % \
+                                   (self.host_pat[reg]['short'], mat.group(2))
+        return new_name, new_type
 
     def __str__(self):
         if   self.ret_ec == 0:
@@ -529,14 +610,17 @@ class Parsing(object):
         return ret_txt
 
     def add_perf(self, key, val):
+        """ Add performance val/key to nagios-string """
         if val != '0':
-            self.statusList.append(" %s %s" % (val, key))
+            self.status_list.append(" %s %s" % (val, key))
         self.perf_list.append("%s=%s" % (key, val))
 
     def get_ec(self):
+        """ returns the current ec """
         return self.ret_ec
 
     def deb(self, lids, msg, typ, deb):
+        """ prints information of given kind (if set in options) """
         if self.opt.lids:
             if has_items(lids, self.opt.lids):
                 print msg
@@ -546,17 +630,15 @@ class Parsing(object):
             print msg
 
     def dump_log(self):
-        fd = open(self.log_file, "a")
+        """ writes nagiosmsg to file where it can be found """
+        filed = open(self.log_file, "a")
         msg = "%s \n" % self.__str__()
-        fd.write(msg)
-        fd.close()
+        filed.write(msg)
+        filed.close()
 
     def create_graphs(self):
-        import create_netgraph
-        create_netgraph.create(self.opt, self.cfg, self.log)
-
-    def set_gui_stuff(self, qnib):
-        self.qnib = qnib
+        """ creates graph """
+        pass
 
 
 def main():

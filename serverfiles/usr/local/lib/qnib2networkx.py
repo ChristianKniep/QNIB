@@ -92,6 +92,8 @@ class NXobj(object):
             return "switch"
         elif type(self) == type(NXchassis("", "")):
             return "chassis"
+        elif type(self) == type(NXswitch("", "")):
+            return "switch"
 
     def is_switch(self):
         """ Default the object ain't a switch """
@@ -114,8 +116,8 @@ class NXhost(NXobj):
 
 class NXsystem(NXobj):
     """ object to handle ib-systems within the graph"""
-    def __init__(self, name, guid):
-        NXobj.__init__(self, name, guid)
+    def __init__(self, guid, name):
+        NXobj.__init__(self, guid, name)
         self.switchguid = None
         self.switchname = None
 
@@ -126,17 +128,27 @@ class NXsystem(NXobj):
     def __str__(self):
         return self.guid
 
-    def update_switchguid(self, guid):
-        """ update the switchguid """
-        self.switchguid = guid
+    def update_switch(self, swports, nguid, nname, lid):
+        """ if systems turns out to be a switch, it is updated """
+        self.cnt_ports = swports
+        self.nodeguid = nguid
+        self.nodename = nname
+        self.lid = lid
 
-    def update_switchname(self, name):
-        """ update the switchguid """
-        self.switchname = name
+    def create_node(self):
+        """ If turns out to be a switch(node) create a node and return """
+        node = NXswitch(self.nodeguid, self.nodename, self.cnt_ports, self.lid)
+        return node
 
 
 class NXswitch(NXobj):
     """ object to handle ib-switches within the graph"""
+    def __init__(self, guid, name, cnt_ports=0, lid=0):
+        """ create an switchinstance with enheritedvals from switchsystem """
+        NXobj.__init__(self, guid, name)
+        self.cnt_ports = cnt_ports
+        self.lid = lid
+
     def func(self):
         """ wait for functionality """
         pass
@@ -148,6 +160,10 @@ class NXswitch(NXobj):
     def is_real(self):
         """ checking if it an ASIC of a modular switch or a compact switch """
         return True
+
+    def part_of(self):
+        """ """
+        pass
 
 
 class NXchassis(NXobj):
@@ -168,14 +184,16 @@ class NXchassis(NXobj):
 class NXedge(object):
     """ edge element """
     def __init__(self, src, s_pint, s_pext,
-                 d_nguid, dst, d_pext, width, speed):
+                 dst, d_pint, d_pext, width, speed):
         """ Initialize with NXnode objects """
         self.src = src
         self.dst = dst
-        
         self.s_pint = s_pint
-        self.d_lid = d_lid
+        self.s_pext = s_pext
         self.d_pint = d_pint
+        self.d_pext = d_pext
+        self.width = width
+        self.speed = speed
 
     def func(self):
         """ wait for functionality """
@@ -200,7 +218,7 @@ class QnibNetworkx(object):
     def add_node(self, node):
         """ Add node with sys and node guid """
         if node.get_type() == "chassis" or \
-            (node.get_type() == "switch" and not node.part_of("chassis")):
+            (node.get_type() == "switch" and node.is_real()):
             # If we are a chassis or an independent switch,
             # we are added to the switch graph
             #print "is switch"
@@ -213,7 +231,23 @@ class QnibNetworkx(object):
 
     def get_node(self, nguid):
         """ returns the NXnode object with given nguid"""
-        return self.ib_graph.node[nguid]
+        try:
+            return self.ib_graph.node[nguid]['node']
+        except KeyError, e:
+            self.pickle_ibgraph
+            self.pickle_swgraph
+            print nguid
+            raise KeyError(e)
+
+    def get_switch(self, sw_name):
+        """ returns the NXnode object with given nguid"""
+        try:
+            return self.sw_graph.node[sw_name]['node']
+        except KeyError, e:
+            self.pickle_ibgraph
+            self.pickle_swgraph
+            print sw_name
+            raise KeyError(e)
 
     def add_sys(self, system):
         """ add a system to the list """
@@ -240,14 +274,10 @@ class QnibNetworkx(object):
     def add_edge(self, src, edge, dst):
         """ connects src, dst with attributes """
         self.ib_graph.add_edge(src.name, dst.name,
-                            s_lid=edge.s_lid,
-                            d_lid=edge.d_lid,
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)
         if src.is_switch() and dst.is_switch():
             self.sw_graph.add_edge(src.name, dst.name,
-                            s_lid=edge.s_lid,
-                            d_lid=edge.d_lid,
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)
 
