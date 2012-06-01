@@ -79,25 +79,19 @@ class NXobj(object):
         self.guid = guid
         self.name = name
         self.asic_count = 0
+        self.typ = None
+
+    def set_type(self, typ):
+        """ Sets the object type """
+        self.typ = typ
 
     def __eq__(self, other):
         """ if the guids match they eq """
         return self.guid == other.guid
 
-    def get_type(self):
+    def get_typ(self):
         """ returns type of obj """
-        if type(self) == type(NXhost("", "")):
-            return "node"
-        elif type(self) == type(NXswitch("", "")):
-            return "switch"
-        elif type(self) == type(NXchassis("", "")):
-            return "chassis"
-        elif type(self) == type(NXswitch("", "")):
-            return "switch"
-
-    def is_switch(self):
-        """ Default the object ain't a switch """
-        return False
+        return self.typ
 
     def __str__(self):
         res = "%s, %s" % (self.guid, self.name)
@@ -108,10 +102,6 @@ class NXhost(NXobj):
     """ object to handle ib-hosts within the graph"""
     def __init__(self, guid, name):
         NXobj.__init__(self, guid, name)
-
-    def is_real(self):
-        """ a host is a real ib entity """
-        return True
 
 
 class NXsystem(NXobj):
@@ -130,35 +120,45 @@ class NXsystem(NXobj):
 
     def update_switch(self, swports, nguid, nname, lid):
         """ if systems turns out to be a switch, it is updated """
+        self.typ = "switch"
+        if self.name == None:
+            self.name = nname
         self.cnt_ports = swports
         self.nodeguid = nguid
         self.nodename = nname
         self.lid = lid
 
-    def create_node(self):
+    def update_host(self, nguid, nname):
+        """ if systems turns out to be a host, it is updated """
+        self.nodeguid = nguid
+        self.nodename = nname
+
+    def create_switch(self):
         """ If turns out to be a switch(node) create a node and return """
-        node = NXswitch(self.nodeguid, self.nodename, self.cnt_ports, self.lid)
-        return node
+        return NXswitch(self.nodeguid, self.nodename, self.cnt_ports, self.lid)
+
+    def create_node(self):
+        """ Returns a node to add to the ib_graph """
+        return NXnode(self.nodeguid, self.nodename)
+
+
+class NXnode(NXobj):
+    """ object to be a node (host/switch) within the ib graph """
+    def __init__(self, guid, name):
+        """ create a nodeinstance with enherited vals from switchsystem """
+        NXobj.__init__(self, guid, name)
 
 
 class NXswitch(NXobj):
     """ object to handle ib-switches within the graph"""
     def __init__(self, guid, name, cnt_ports=0, lid=0):
-        """ create an switchinstance with enheritedvals from switchsystem """
+        """ create an switchinstance with enherited vals from switchsystem """
         NXobj.__init__(self, guid, name)
         self.cnt_ports = cnt_ports
         self.lid = lid
 
-    def func(self):
-        """ wait for functionality """
-        pass
-
     def is_switch(self):
         """ A switch is a switch """
-        return True
-
-    def is_real(self):
-        """ checking if it an ASIC of a modular switch or a compact switch """
         return True
 
     def part_of(self):
@@ -175,10 +175,6 @@ class NXchassis(NXobj):
     def is_switch(self):
         """ A chassis is also a switch """
         return True
-
-    def is_real(self):
-        """ A chassis is only a real ib-object if it holds one asic"""
-        return self.asic_count == 1
 
 
 class NXedge(object):
@@ -202,8 +198,9 @@ class NXedge(object):
 
 class QnibNetworkx(object):
     """ object to create and alter graph """
-    def __init__(self):
+    def __init__(self, opt):
         """ initialise object with clean graph """
+        self.opt = opt
         # ib-graph with all real objects
         self.ib_graph = nx.MultiGraph()
         # logical view with human readable switches
@@ -211,23 +208,29 @@ class QnibNetworkx(object):
         # list of systems
         self.systems = {}
 
+    def deb(self, msg, level=1):
+        """ print debug information """
+        if level <= self.opt.debug:
+            print msg
+
     def edges(self):
         """ returns all edges """
         return self.ib_graph.edges()
 
+    def add_switch(self, switch):
+        """ Add switch to switchgraph """
+        # If we are a chassis or an independent switch,
+        # we are added to the switch graph
+        if switch.name not in self.sw_graph.nodes():
+            self.deb("Adding %s: %s" % (switch.get_typ(), switch.name))
+            self.sw_graph.add_node(switch.name)
+            self.sw_graph.node[switch.name]['node'] = switch
+
     def add_node(self, node):
-        """ Add node with sys and node guid """
-        if node.get_type() == "chassis" or \
-            (node.get_type() == "switch" and node.is_real()):
-            # If we are a chassis or an independent switch,
-            # we are added to the switch graph
-            #print "is switch"
-            self.sw_graph.add_node(node.name)
-            self.sw_graph.node[node.name]['node'] = node
-        if node.is_real():
-            # if the node is a real IB-entity, we are added to the ib-graph
-            self.ib_graph.add_node(node.guid)
-            self.ib_graph.node[node.guid]['node'] = node
+        """ Add ib node to the node graph """ 
+        # if the node is a real IB-entity, we are added to the ib-graph
+        self.ib_graph.add_node(node.guid)
+        self.ib_graph.node[node.guid]['node'] = node
 
     def get_node(self, nguid):
         """ returns the NXnode object with given nguid"""
@@ -265,7 +268,11 @@ class QnibNetworkx(object):
 
     def dst_not_in(self, nguid):
         """ determin whether a nodeguid of a switchport destination is in """
-        return not nguid in self.ib_graph
+        check = not nguid in self.ib_graph
+        if not check:
+            self.deb("Destination '%s' in the graph: \n %s" % \
+                     (nguid, ",".join(self.ib_graph.nodes())), 2)
+        return check
 
     def is_in(self, node):
         """ check whether the given node is in the graph or not"""
@@ -277,6 +284,7 @@ class QnibNetworkx(object):
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)
         if src.is_switch() and dst.is_switch():
+            self.deb("Adding interswitch edges: %s<>%s" % (src.name, dst.name))
             self.sw_graph.add_edge(src.name, dst.name,
                             s_p_int=edge.s_pint,
                             d_p_int=edge.d_pint)

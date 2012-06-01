@@ -207,7 +207,7 @@ class SwPortExtExt(SWport):
 class Parsing(object):
     """ parsing object which holds the functionality """
     def __init__(self, options, cfg, log):
-        self.q_net = qnx.QnibNetworkx()
+        self.q_net = qnx.QnibNetworkx(options)
         self.cfg = cfg
         self.opt = options
         self.log = log
@@ -444,11 +444,12 @@ class Parsing(object):
     def match_switchport(self, line):
         """ Matching simplest switchport (no external ports) """
         reg = "^\[(\d+)\][ \t]+\"[SH]-[0]*([a-z0-9]+)\""
-        reg += "\[(\d+)\].*#[ \t]+\".*\"[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
+        reg += "\[(\d+)\].*#[ \t]+\"(.*)\"[ \t]+lid[ \t]\d+ (\d+)x([A-Z]DR)"
         mat = re.match(reg, line)
         if mat:
-            (s_pint, d_nguid, d_pint,
+            (s_pint, d_nguid, d_pint, d_name,
              width, speed) = mat.groups()
+            self.deb("Matching simple SwPort: <>%s" % (d_name), 2)
             if self.q_net.dst_not_in(d_nguid):
                 return True
             else:
@@ -481,8 +482,9 @@ class Parsing(object):
         reg = "sysimgguid=0x([0-9a-f]+)[ \t]+# Chassis (\d+)"
         mat = re.match(reg, line)
         if mat:
+            c_name = self.get_chassis()[1]
             self.sysimgguid = mat.group(1)
-            system = qnx.NXsystem(self.sysimgguid, None)
+            system = qnx.NXsystem(self.sysimgguid, c_name)
             self.q_net.add_sys(system)
             return True
         # systemguid
@@ -536,26 +538,25 @@ class Parsing(object):
             #  * switchname  (appended to the switchguid like Lineboard9 Chip1)
             #   -> importent to know which module of the switch is handled
             (swports, nguid, name, lid) = mat.groups()
+            nname = self.eval_name(name)[0]
 
-            # if we are in a chassis we should have informations stored
+            # so we created a system out of sysimgguid earlier
+            system = self.q_net.get_sys(self.sysimgguid)
+            system.update_switch(swports, nguid, nname, lid)
+            # this leads us to a node
+            node = system.create_node()
+            self.nodeguid = nguid
+
             (c_guid, c_name) = self.get_chassis()
             if c_guid != None:
                 # if so, we name the node with the chassis-name
                 switch = self.q_net.get_switch(c_name)
+                # TODO: All edges have to be append to the chassis
             else:
-                self.nodeguid = nguid
-                nname = self.eval_name(name)[0]
-                # if we match here, switch-/sysimgguid _has_ to be given
-                # therefore we can adress the system
-                system = self.q_net.get_sys(self.sysimgguid)
-                if type(system) == type(None):
-                    # We got a singular switch, so we create a chassis ans system
-                    # for the switchgraph
-                    chassis = qnx.NXchassis(nguid, nname)
-                    system = qnx.NXsystem(nguid, nname)
-                system.update_switch(swports, nguid, nname, lid)
-                switch = system.create_node()
-            self.q_net.add_node(switch)
+                # otherwise this is a singluar switch and its the nodename
+                switch = system
+                self.q_net.add_switch(switch)
+            self.q_net.add_node(node)
         return mat
 
     def eval_name(self, name):
@@ -619,14 +620,9 @@ class Parsing(object):
         """ returns the current ec """
         return self.ret_ec
 
-    def deb(self, lids, msg, typ, deb):
-        """ prints information of given kind (if set in options) """
-        if self.opt.lids:
-            if has_items(lids, self.opt.lids):
-                print msg
-        elif typ == 'p' and self.opt.parse and self.opt.debug >= deb:
-            print msg
-        elif typ == 'l' and self.opt.links and self.opt.debug >= deb:
+    def deb(self, msg, level=1):
+        """ prints debug information """
+        if level <= self.opt.debug:
             print msg
 
     def dump_log(self):
