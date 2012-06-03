@@ -330,9 +330,11 @@ class Parsing(object):
             (c_nr, c_guid) = mat.groups()
             name = self.chassis_names[c_guid]['name']
             cname = self.eval_name(name)[0]
+            self.deb("Matche Chassis '%s' (nr:%s / guid:%s)" % \
+                     (cname, c_nr, c_guid))
             self.set_chassis(c_guid, cname)
-            chassis = qnx.NXchassis(c_guid, cname)
-            self.q_net.add_node(chassis)
+            switch = qnx.NXswitch(c_guid, cname)
+            self.q_net.add_switch(switch)
         return mat
 
     def match_continue(self, line):
@@ -484,7 +486,8 @@ class Parsing(object):
         if mat:
             c_name = self.get_chassis()[1]
             self.sysimgguid = mat.group(1)
-            system = qnx.NXsystem(self.sysimgguid, c_name)
+            system = qnx.NXsystem(self.sysimgguid)
+            system.update_chassis(c_name)
             self.q_net.add_sys(system)
             return True
         # systemguid
@@ -493,7 +496,7 @@ class Parsing(object):
         if mat:
             self.reset_board()
             self.sysimgguid = mat.group(1)
-            system = qnx.NXsystem(self.sysimgguid, None)
+            system = qnx.NXsystem(self.sysimgguid)
             self.q_net.add_sys(system)
             return True
         return False
@@ -546,16 +549,9 @@ class Parsing(object):
             # this leads us to a node
             node = system.create_node()
             self.nodeguid = nguid
-
-            (c_guid, c_name) = self.get_chassis()
-            if c_guid != None:
-                # if so, we name the node with the chassis-name
-                switch = self.q_net.get_switch(c_name)
-                # TODO: All edges have to be append to the chassis
-            else:
-                # otherwise this is a singluar switch and its the nodename
-                switch = system
-                self.q_net.add_switch(switch)
+            # the switch had to know if he is part of a modular switch
+            # he will know, cause the system has no chassis addition
+            switch = system.create_switch()
             self.q_net.add_node(node)
         return mat
 
